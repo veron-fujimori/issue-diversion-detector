@@ -19,8 +19,17 @@ def init_pool(min_conn: int = 2, max_conn: int = 3) -> None:
             minconn=min_conn,
             maxconn=max_conn,
             dsn=settings.db_dsn,
+            options="-c TimeZone=Asia/Jakarta",
         )
-        logger.info(f"DB pool initialized ({min_conn}-{max_conn} connections)")
+
+        conn = _pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SHOW TimeZone")
+                tz = cur.fetchone()[0]
+                logger.info(f"DB pool initialized ({min_conn}-{max_conn} connections) | timezone={tz}")
+        finally:
+            _pool.putconn(conn)
     except psycopg2.OperationalError as e:
         logger.error(f"Gagal konek ke database: {e}")
         raise
