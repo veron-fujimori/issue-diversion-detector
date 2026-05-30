@@ -7,8 +7,8 @@ from db.repositories.volume_repo import save_volumes
 WIB = timezone(timedelta(hours=7))
 
 def _generate_slots(start: datetime, end: datetime) -> list[datetime]:
-    slot_hour = (start.astimezone(WIB).hour // 4) * 4
-    current = start.astimezone(WIB).replace(
+    slot_hour = (start.hour // 4) * 4
+    current = start.replace(
         hour=slot_hour, minute=0, second=0, microsecond=0
     )
     slots = []

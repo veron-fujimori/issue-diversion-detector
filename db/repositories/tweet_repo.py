@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from db.connection import get_cursor
 from utils.logger import logger
 
