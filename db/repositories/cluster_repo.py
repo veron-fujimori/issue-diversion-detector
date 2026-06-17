@@ -71,5 +71,8 @@ def get_recent_clusters(date: str, days: int = 7) -> list[Cluster]:
         for row in rows
     ]
 
-    logger.debug(f"cluster_repo | recent context | {len(clusters)} clusters from last {days} days before {date}")
+    logger.debug(
+        f"cluster_repo | recent context | {len(clusters)} clusters "
+        f"from last {days} days before {date}"
+    )
     return clusters

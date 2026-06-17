@@ -2,25 +2,24 @@ from utils.logger import logger
 from db.repositories.trending_repo import get_all_dates
 from pipeline.clustering import clusterer
 from pipeline.timeseries import timeseries
-# from pipeline.detection import detector
+from pipeline.detection import detector
 
 def run_for_date(date: str) -> None:
     logger.info(f"orchestrator | ===== START {date} =====")
     try:
-        # logger.info(f"orchestrator | [1/3] clustering")
+        # logger.info(f"orchestrator | [1/4] clustering")
         # clusterer.run(date)
 
-        logger.info(f"orchestrator | [2/3] timeseries")
-        timeseries.run(date)
+        # logger.info(f"orchestrator | [2/4] timeseries")
+        # timeseries.run(date)
 
-        # logger.info(f"orchestrator | [3/3] detection")
-        # detector.run(date)
+        logger.info(f"orchestrator | [3/4] detection")
+        detector.run(date)
     except Exception as e:
         logger.error(f"orchestrator | FAILED at date={date} | {e}")
         raise
 
     logger.info(f"orchestrator | ===== DONE {date} =====")
-
 
 def run_all() -> None:
     dates = get_all_dates()
