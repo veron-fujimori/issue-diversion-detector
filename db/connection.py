@@ -20,6 +20,10 @@ def init_pool(min_conn: int = 2, max_conn: int = 3) -> None:
             maxconn=max_conn,
             dsn=settings.db_dsn,
             options="-c TimeZone=Asia/Jakarta",
+            keepalives=1,
+            keepalives_idle=30,
+            keepalives_interval=10,
+            keepalives_count=5,
         )
 
         conn = _pool.getconn()
