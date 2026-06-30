@@ -5,14 +5,18 @@ from utils.logger import logger
 def get_volume_by_topics_and_slot(topics: list[str], slot_start: datetime) -> int:
     slot_end = slot_start + timedelta(hours=4)
 
+    if not topics:
+        return 0
+    
     with get_cursor() as cur:
         cur.execute(
             """
-            SELECT COUNT(*) AS tweet_count
-            FROM tweet
-            WHERE collected_for_hashtag = ANY(%s)
-              AND "timestamp" >= %s
-              AND "timestamp" <  %s
+            SELECT COUNT(DISTINCT tt.tweet_id) AS tweet_count
+            FROM tweet_topic tt
+            JOIN tweet t ON t.tweet_id = tt.tweet_id
+            WHERE tt.topic = ANY(%s)
+              AND t."timestamp" >= %s
+              AND t."timestamp" <  %s
             """,
             (topics, slot_start, slot_end),
         )

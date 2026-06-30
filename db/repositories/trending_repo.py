@@ -5,15 +5,15 @@ def get_unique_topics_by_date(date: str) -> list[str]:
     with get_cursor() as cur:
         cur.execute(
             """
-            SELECT DISTINCT hashtag
+            SELECT DISTINCT topic
             FROM trending
             WHERE date = %s
-            ORDER BY hashtag
+            ORDER BY topic
             """,
             (date,),
         )
         rows = cur.fetchall()
-        topics = [row["hashtag"] for row in rows]
+        topics = [row["topic"] for row in rows]
 
     logger.debug(f"trending_repo | date={date} | found {len(topics)} unique topics")
     return topics
