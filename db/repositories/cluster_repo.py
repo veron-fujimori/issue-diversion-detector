@@ -47,6 +47,28 @@ def get_clusters_by_date(date: str) -> list[Cluster]:
         for row in rows
     ]
 
+def get_cluster_by_id(cluster_id: int) -> Cluster | None:
+    with get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, date, cluster_label, topics
+            FROM clusters
+            WHERE id = %s
+            """,
+            (cluster_id,),
+        )
+        row = cur.fetchone()
+
+    if row is None:
+        return None
+
+    return Cluster(
+        id=row["id"],
+        date=str(row["date"]),
+        cluster_label=row["cluster_label"],
+        topics=list(row["topics"]),
+    )
+
 def get_recent_clusters(date: str, days: int = 7) -> list[Cluster]:
     with get_cursor() as cur:
         cur.execute(

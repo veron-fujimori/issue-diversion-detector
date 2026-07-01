@@ -129,8 +129,8 @@ def run(date: str) -> None:
 
         best_corr, best_lag = _best_lagged_correlation(series_a, series_b)
 
-        if best_corr > CORRELATION_THRESHOLD:
-            continue
+        # if best_corr > CORRELATION_THRESHOLD:
+        #     continue
 
         if spike_a >= spike_b:
             rising_id, falling_id = id_a, id_b

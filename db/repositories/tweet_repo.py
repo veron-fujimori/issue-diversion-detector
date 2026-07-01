@@ -28,3 +28,31 @@ def get_volume_by_topics_and_slot(topics: list[str], slot_start: datetime) -> in
         f"topics={len(topics)} | count={count}"
     )
     return count
+
+def get_all_tweets_by_topics_and_date(topics: list[str], date: str) -> list[dict]:
+    with get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                t.user_screen_name,
+                t."timestamp",
+                t.text,
+                t.likes,
+                t.retweets,
+                t.view_count,
+                u.created_at      AS account_created_at,
+                u.followers_count AS followers_count
+            FROM tweet t
+            LEFT JOIN "user" u ON t.user_screen_name = u.screen_name
+            WHERE t.collected_for_hashtag = ANY(%s)
+              AND t.collected_date = %s
+            """,
+            (topics, date),
+        )
+        rows = cur.fetchall()
+
+    logger.debug(
+        f"tweet_repo | date={date} | topics={len(topics)} | "
+        f"fetched {len(rows)} tweets (no sampling)"
+    )
+    return rows
