@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 from db.connection import get_cursor
 from utils.logger import logger
+import json
 
 @dataclass
 class Alert:
@@ -68,15 +69,11 @@ def update_score(alert_id: int, confidence_score: float, score_breakdown: dict) 
             """
             UPDATE alerts
             SET confidence_score = %s,
-                score_breakdown  = %s
+                score_breakdown  = %s::jsonb
             WHERE id = %s
             """,
-            (confidence_score, score_breakdown, alert_id),
+            (confidence_score, json.dumps(score_breakdown), alert_id),
         )
-    logger.debug(
-        f"alert_repo | updated score | alert_id={alert_id} | "
-        f"confidence_score={confidence_score:.1f}"
-    )
 
 def get_alerts_by_date(detected_at: str) -> list[Alert]:
     with get_cursor() as cur:

@@ -1,7 +1,8 @@
 import json
 from dataclasses import dataclass
 from typing import Union
-from groq import Groq, APIError, RateLimitError
+# from groq import Groq, APIError, RateLimitError
+from openai import OpenAI, APIError, RateLimitError
 from config.settings import settings
 from utils.logger import logger
 
@@ -12,8 +13,11 @@ class LLMResponse:
 
 class LLMClient:
     def __init__(self) -> None:
-        self._groq = Groq(api_key=settings.GROQ_API_KEY)
-        self.model = settings.GROQ_MODEL
+        # self._groq = Groq(api_key=settings.GROQ_API_KEY)
+        self._client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+        # self.model = settings.GROQ_MODEL
+        self.model = settings.OPENAI_MODEL
 
     def chat(
         self,
@@ -24,7 +28,8 @@ class LLMClient:
     ) -> LLMResponse:
         content = None
         try:
-            response = self._groq.chat.completions.create(
+            # response = self._groq.chat.completions.create(
+            response = self._client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system},
@@ -53,11 +58,11 @@ class LLMClient:
             raise
 
         except RateLimitError:
-            logger.error("Groq rate limit hit")
+            logger.error("Rate limit hit")
             raise
 
         except APIError as e:
-            logger.error(f"Groq API error: {e}")
+            logger.error(f"API error: {e}")
             raise
 
 llm = LLMClient()

@@ -22,8 +22,10 @@ class Settings(BaseSettings):
     DB_PASSWORD: str
 
     # ── LLM (clustering / classification) ──
-    GROQ_API_KEY: str
-    GROQ_MODEL: str
+    # GROQ_API_KEY: str
+    # GROQ_MODEL: str
+    OPENAI_API_KEY: str
+    OPENAI_MODEL: str
 
     # ── Collection scope ──
     REGION: str = "indonesia"

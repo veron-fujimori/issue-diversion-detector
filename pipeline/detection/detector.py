@@ -8,7 +8,7 @@ from db.repositories.alert_repo import save_alert
 WIB = timezone(timedelta(hours=7))
 WINDOW_HOURS = 48
 LAG_SLOTS = [0, 1, 2, 3]
-CORRELATION_THRESHOLD = -0.6
+CORRELATION_THRESHOLD = -0.1
 SPIKE_RATIO_THRESHOLD = 2.0
 MIN_DATA_POINTS = 6
 
@@ -129,8 +129,8 @@ def run(date: str) -> None:
 
         best_corr, best_lag = _best_lagged_correlation(series_a, series_b)
 
-        # if best_corr > CORRELATION_THRESHOLD:
-        #     continue
+        if best_corr > CORRELATION_THRESHOLD:
+            continue
 
         if spike_a >= spike_b:
             rising_id, falling_id = id_a, id_b
