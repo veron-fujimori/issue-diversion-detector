@@ -4,7 +4,7 @@ from config.settings import settings
 from utils.logger import logger
 
 def get_volume_by_topics_and_slot(topics: list[str], slot_start: datetime) -> int:
-    slot_end = slot_start + timedelta(hours=1)
+    slot_end = slot_start + timedelta(hours=settings.VOLUME_INTERVAL_HOURS)
 
     if not topics:
         return 0
@@ -31,29 +31,34 @@ def get_volume_by_topics_and_slot(topics: list[str], slot_start: datetime) -> in
     return count
 
 def get_all_tweets_by_topics_and_date(topics: list[str], date: str) -> list[dict]:
+    if not topics:
+        return []
+ 
     with get_cursor() as cur:
         cur.execute(
             """
-            SELECT
+            SELECT DISTINCT ON (t.tweet_id)
+                t.tweet_id,
                 t.user_screen_name,
-                t."timestamp",
+                t.timestamp_utc     AS timestamp,
                 t.text,
                 t.likes,
                 t.retweets,
                 t.view_count,
-                u.created_at      AS account_created_at,
-                u.followers_count AS followers_count
-            FROM tweet t
-            LEFT JOIN "user" u ON t.user_screen_name = u.screen_name
-            WHERE t.collected_for_hashtag = ANY(%s)
+                u.created_at        AS account_created_at,
+                u.followers_count   AS followers_count
+            FROM tweet_topic tt
+            JOIN tweet t          ON t.tweet_id = tt.tweet_id
+            LEFT JOIN "user" u    ON u.screen_name = t.user_screen_name
+            WHERE tt.topic = ANY(%s)
               AND t.collected_date = %s
             """,
             (topics, date),
         )
         rows = cur.fetchall()
-
+ 
     logger.debug(
         f"tweet_repo | date={date} | topics={len(topics)} | "
-        f"fetched {len(rows)} tweets (no sampling)"
+        f"fetched {len(rows)} tweets (with profiles)"
     )
     return rows
