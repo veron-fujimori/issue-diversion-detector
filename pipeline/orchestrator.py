@@ -10,11 +10,11 @@ def run_for_date(date: str) -> None:
         # logger.info(f"orchestrator | [1/4] clustering")
         # clusterer.run(date)
 
-        # logger.info(f"orchestrator | [2/4] timeseries")
-        # timeseries.run(date)
+        logger.info(f"orchestrator | [2/4] timeseries")
+        timeseries.run(date)
 
-        logger.info(f"orchestrator | [3/4] detection")
-        detector.run(date)
+        # logger.info(f"orchestrator | [3/4] detection")
+        # detector.run(date)
     except Exception as e:
         logger.error(f"orchestrator | FAILED at date={date} | {e}")
         raise

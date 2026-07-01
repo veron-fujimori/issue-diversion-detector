@@ -15,8 +15,8 @@ def get_volume_by_topics_and_slot(topics: list[str], slot_start: datetime) -> in
             FROM tweet_topic tt
             JOIN tweet t ON t.tweet_id = tt.tweet_id
             WHERE tt.topic = ANY(%s)
-              AND t."timestamp" >= %s
-              AND t."timestamp" <  %s
+              AND t.timestamp_utc >= %s
+              AND t.timestamp_utc <  %s
             """,
             (topics, slot_start, slot_end),
         )
