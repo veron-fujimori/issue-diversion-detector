@@ -45,11 +45,10 @@ def compute(alert: Alert, analysis: AnalysisResult) -> tuple[float, dict]:
             "raw":   round(alert.spike_magnitude, 4),
         },
         "coordinated": {
-            "score":              s_coordinated,
-            "max":                W_COORDINATED,
-            "raw":                round(analysis.coordinated_ratio, 4),
-            "account_count":      analysis.account_count,
-            "mean_account_score": round(analysis.mean_account_score, 4),
+            "score":         s_coordinated,
+            "max":           W_COORDINATED,
+            "raw":           round(analysis.coordinated_ratio, 4),
+            "account_count": analysis.account_count,
         },
         "total":            total,
         "threshold":        DIVERSION_THRESHOLD,
@@ -83,7 +82,7 @@ def run(alert: Alert, analysis: AnalysisResult) -> float:
         f"rising='{alert.rising_cluster_label}' | "
         f"score={total:.1f}/{DIVERSION_THRESHOLD} | "
         f"accounts={analysis.account_count} | "
-        f"mean_score={analysis.mean_account_score:.3f} | "
+        f"coordinated_ratio={analysis.coordinated_ratio:.3f} | "
         f"{flag}"
     )
 
