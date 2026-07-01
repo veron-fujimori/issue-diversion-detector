@@ -6,3 +6,5 @@ Scweet==5.3
 selenium==4.44.0
 webdriver-manager==4.1.1
 beautifulsoup4==4.12.3
+scikit-learn==1.9.0
+Sastrawi

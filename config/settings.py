@@ -29,12 +29,14 @@ class Settings(BaseSettings):
     REGION: str = "indonesia"
     DATE_START: str                       # 'YYYY-MM-DD'
     DATE_END: str                         # 'YYYY-MM-DD'
-    TREND_INTERVAL: int = 4               # hours between trending slots (00:00, 04:00, ...)
+    TREND_INTERVAL: int = 1               # hours between trending slots (00:00, 01:00, ...)
 
     # lang filter is currently DISABLED: combining lang='id' with display_type='Latest' returns 0 tweets (Scweet/Twitter bug). 
     # Kept here for future use; empty string means "no language filter".
     LANG: str = ""
 
+    VOLUME_INTERVAL_HOURS: int = 1
+    
     # ── Trending archive ──
     TRENDING_BASE_URL: str = "https://archive.twitter-trending.com"
 

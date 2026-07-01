@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from db.connection import get_cursor
+from config.settings import settings
 from utils.logger import logger
 
 def get_volume_by_topics_and_slot(topics: list[str], slot_start: datetime) -> int:
@@ -24,8 +25,8 @@ def get_volume_by_topics_and_slot(topics: list[str], slot_start: datetime) -> in
 
     count = int(row["tweet_count"]) if row else 0
     logger.debug(
-        f"tweet_repo | slot={slot_start.strftime('%Y-%m-%d %H:%M')} | "
-        f"topics={len(topics)} | count={count}"
+        f"tweet_repo | slot={slot_start.strftime('%Y-%m-%d %H:%M')} "
+        f"({settings.VOLUME_INTERVAL_HOURS}h) | topics={len(topics)} | count={count}"
     )
     return count
 
