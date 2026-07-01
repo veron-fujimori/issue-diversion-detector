@@ -16,19 +16,39 @@ Jika digabung, volumenya mencerminkan besarnya perhatian publik terhadap kenaika
 1. IDENTIFIKASI konteks setiap topic:
    - Cari tahu topic ini membahas ISU APA secara spesifik
    - Jika berbahasa asing, singkatan, atau tidak jelas → telusuri maknanya dulu
-   - Pertimbangkan: apakah ini nama orang, nama grup, nama acara, nama produk, atau isu sosial?
+   - Pertimbangkan: apakah ini nama orang, nama grup, nama acara, nama produk, nama organisasi, nama tim, nama film, anime, game, perusahaan, atau isu sosial?
 
 2. KELOMPOKKAN berdasarkan ISU SPESIFIK yang sama:
    - Topic yang membahas hal yang SAMA meski kata-katanya berbeda → satu cluster
-   - Topic yang menyebut anggota atau bagian dari satu entitas yang sama (grup, tim, franchise, series) → satu cluster dengan nama entitas tersebut
+   - Topic yang menyebut anggota, karakter, pemain, pelatih, pemeran, produk, episode, atau bagian dari satu entitas yang sama (grup, tim, franchise, series, perusahaan, organisasi) → satu cluster dengan nama entitas tersebut
    - Topic yang tidak berkaitan satu sama lain → cluster terpisah
 
 ## Aturan label
 
 - Maksimal 5 kata, Bahasa Indonesia
-- Harus menggambarkan isu spesifik yang dibahas, bukan kategori besar
-- Gunakan nama nyata jika ada
-- DILARANG label generik atau samar seperti: "Politik", "Olahraga", "Hiburan", "Lain-lain", "Campuran"
+- Label HARUS berupa nama entitas, peristiwa, atau isu spesifik yang menjadi inti pembahasan.
+- Gunakan nama resmi atau nama yang paling dikenal jika ada.
+- Jika cluster membahas grup, tim, franchise, film, anime, game, perusahaan, organisasi, produk, atau tokoh tertentu, gunakan nama entitas tersebut sebagai label.
+- Jika cluster membahas suatu peristiwa atau isu, gunakan nama peristiwa atau isu tersebut sebagai label.
+- DILARANG menggunakan label kategori yang terlalu umum seperti: "Politik", "Olahraga", "Sepak Bola", "Hiburan", "Film", "Musik", "Anime", "Drama Korea", "Esports", "Teknologi", "Ekonomi", "Lain-lain", atau "Campuran".
+- Topic yang masih berada dalam kategori yang sama tetapi membahas entitas yang berbeda HARUS dipisahkan.
+
+Contoh label yang BENAR:
+- "One Piece"
+- "BLACKPINK"
+- "Persib Bandung"
+- "Film Jumbo"
+- "Mobile Legends"
+- "Kenaikan Harga BBM"
+- "Gempa Aceh"
+
+Contoh label yang SALAH:
+- "Anime"
+- "Musik"
+- "Film"
+- "Hiburan"
+- "Olahraga"
+- "Ekonomi"
 
 ## Aturan kritis
 
@@ -48,7 +68,6 @@ Balas HANYA dengan JSON valid berikut, tanpa teks apapun di luar JSON:
   ]
 }
 """.strip()
-
 
 def build_user_prompt(topics: list[str], existing_clusters: list[dict] | None = None) -> str:
     lines = ["Kelompokkan trending topic berikut:"]
