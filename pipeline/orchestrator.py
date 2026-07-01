@@ -19,16 +19,16 @@ def run_collection(
     Collect trends, then tweets, then (optionally) user profiles for a date
     range. Falls back to settings.DATE_START / settings.DATE_END if not given.
     """
-    start = date_start or settings.DATE_START
-    end   = date_end   or settings.DATE_END
+    # start = date_start or settings.DATE_START
+    # end   = date_end   or settings.DATE_END
  
-    logger.info(f"orchestrator | ===== COLLECTION {start} → {end} =====")
+    # logger.info(f"orchestrator | ===== COLLECTION {start} → {end} =====")
  
-    logger.info("orchestrator | [collect 1/3] trends")
-    trends_collector.run(start, end)
+    # logger.info("orchestrator | [collect 1/3] trends")
+    # trends_collector.run(start, end)
  
-    logger.info("orchestrator | [collect 2/3] tweets")
-    tweets_collector.run(start, end)
+    # logger.info("orchestrator | [collect 2/3] tweets")
+    # tweets_collector.run(start, end)
  
     if include_users:
         logger.info("orchestrator | [collect 3/3] users")

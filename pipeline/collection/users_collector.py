@@ -251,7 +251,7 @@ def run() -> None:
         )
 
         try:
-            records = s.get_user_info(usernames=batch)
+            records = s.get_user_info(users=batch)
         except Exception as e:
             err_type = type(e).__name__
             if "AccountPoolExhausted" in err_type or "pool" in str(e).lower():
@@ -263,9 +263,31 @@ def run() -> None:
             logger.error(f"users_collector | batch {batch_num} error: {err_type}: {e} — skipping")
             continue
 
+        # Normalise the return shape: get_user_info may return a list of dicts,
+        # a single dict (for a one-element request), or None. Coerce to a list.
+        if records is None:
+            records = []
+        elif isinstance(records, dict):
+            records = [records]
+
         if not records:
             logger.warning(f"users_collector | batch {batch_num} returned 0 records")
             continue
+
+        # Report accounts that returned no profile (suspended / deleted / renamed).
+        # They stay in the needs-profile list and would be retried; log so the
+        # gap is visible rather than silently burning quota each run.
+        returned_names = {
+            (r.get("username") or r.get("screen_name") or "").casefold()
+            for r in records
+        }
+        missing_in_batch = [u for u in batch if u.casefold() not in returned_names]
+        if missing_in_batch:
+            logger.warning(
+                f"users_collector | batch {batch_num} — {len(missing_in_batch)} "
+                f"account(s) returned no profile (suspended/deleted/renamed): "
+                f"{missing_in_batch[:10]}{' ...' if len(missing_in_batch) > 10 else ''}"
+            )
 
         inserted = _insert_users(records)
         inserted_total += inserted
