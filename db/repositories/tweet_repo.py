@@ -3,7 +3,7 @@ from db.connection import get_cursor
 from utils.logger import logger
 
 def get_volume_by_topics_and_slot(topics: list[str], slot_start: datetime) -> int:
-    slot_end = slot_start + timedelta(hours=4)
+    slot_end = slot_start + timedelta(hours=1)
 
     if not topics:
         return 0

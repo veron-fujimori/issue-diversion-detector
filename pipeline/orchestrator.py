@@ -22,7 +22,6 @@ def run_for_date(date: str) -> None:
         
         # logger.info(f"orchestrator | [4/4] analysis and scoring")
         # _run_analysis_and_scoring(date)
-
     except Exception as e:
         logger.error(f"orchestrator | FAILED at date={date} | {e}")
         raise
