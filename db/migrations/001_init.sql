@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS trending (
 CREATE INDEX IF NOT EXISTS idx_trending_topic ON trending(topic);
 CREATE INDEX IF NOT EXISTS idx_trending_date  ON trending(date);
 
--- ── Raw tweets from Scweet (Stage 2 output) ──
+-- ── Raw tweets from Scweet ──
 -- One immutable row per tweet (tweet_id is the natural key). 
 -- Content is never duplicated and never mutated after insert.
 -- Topic attribution lives in the tweet_topic junction table, not here.
@@ -41,7 +41,7 @@ CREATE INDEX IF NOT EXISTS idx_tweet_timestamp_utc  ON tweet(timestamp_utc);
 CREATE INDEX IF NOT EXISTS idx_tweet_collected_date ON tweet(collected_date);
 CREATE INDEX IF NOT EXISTS idx_tweet_user           ON tweet(user_screen_name);
 
--- ── Tweet ↔ trending-topic attribution (junction) ───────────────────────────
+-- ── Tweet <> trending-topic attribution (junction) ──
 -- One row per (tweet, trending topic it matched).
 -- Populated during fetch: each Scweet search inserts its tweets here tagged with every trending topic the tweet matched. 
 -- The composite PK makes re-matches idempotent — a tweet returned by several searches accumulates one junction row per distinct topic.
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS tweet_topic (
 CREATE INDEX IF NOT EXISTS idx_tweet_topic_topic    ON tweet_topic(topic);
 CREATE INDEX IF NOT EXISTS idx_tweet_topic_tweet_id ON tweet_topic(tweet_id);
 
--- ── Scrape job tracking (Stage 2 resume) ──
+-- ── Scrape job tracking ──
 -- One row per search job (a topic batch or a single plain-text phrase) per date.
 -- Lets an interrupted collection resume without re-fetching completed jobs.
 CREATE TABLE IF NOT EXISTS scrape_job (
@@ -73,3 +73,29 @@ CREATE TABLE IF NOT EXISTS scrape_job (
 
 CREATE INDEX IF NOT EXISTS idx_scrape_job_date   ON scrape_job(date);
 CREATE INDEX IF NOT EXISTS idx_scrape_job_status ON scrape_job(status);
+
+-- ── User profiles (Stage 2b output) ──
+CREATE TABLE IF NOT EXISTS "user" (
+    user_id           TEXT        PRIMARY KEY,
+    screen_name       TEXT        UNIQUE NOT NULL,   -- @handle; joins to tweet.user_screen_name
+    display_name      TEXT,                          -- Scweet 'name'
+    description       TEXT,
+    location          TEXT,
+    created_at        TIMESTAMPTZ,                   -- parsed; analyzer uses .date() for account age
+    created_at_raw    TEXT,                          -- original Twitter date string (audit)
+    followers_count   INTEGER     DEFAULT 0,
+    following_count   INTEGER     DEFAULT 0,
+    statuses_count    INTEGER     DEFAULT 0,
+    favourites_count  INTEGER     DEFAULT 0,
+    media_count       INTEGER     DEFAULT 0,
+    listed_count      INTEGER     DEFAULT 0,
+    verified          INTEGER     DEFAULT 0,          -- legacy verified (0/1)
+    blue_verified     INTEGER     DEFAULT 0,          -- paid verification (0/1)
+    protected         INTEGER     DEFAULT 0,          -- private account (0/1)
+    url               TEXT,                           -- website in bio
+    collected_at      TIMESTAMPTZ DEFAULT NOW()
+);
+ 
+CREATE INDEX IF NOT EXISTS idx_user_screen_name     ON "user"(screen_name);
+CREATE INDEX IF NOT EXISTS idx_user_created_at      ON "user"(created_at);
+CREATE INDEX IF NOT EXISTS idx_user_followers_count ON "user"(followers_count);
