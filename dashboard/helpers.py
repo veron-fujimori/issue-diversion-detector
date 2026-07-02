@@ -90,7 +90,7 @@ def render_volume_bar(clusters_data: list[dict]) -> None:
 
 def render_volume_timeseries(clusters_data: list[dict], target_date: str) -> None:
     """
-    Multi-line timeseries: volume per slot 4 jam, nilai absolut.
+    Multi-line timeseries: volume per slot 1 jam, nilai absolut.
     Semua cluster dalam satu chart — user bisa klik legend untuk
     hide/show cluster tertentu sehingga perbandingan skala bisa
     diatur sendiri tanpa perlu normalisasi.
@@ -110,7 +110,7 @@ def render_volume_timeseries(clusters_data: list[dict], target_date: str) -> Non
         ))
 
     fig.update_layout(
-        title=f"Timeseries Volume per Slot 4 Jam — window 48 jam s/d {target_date}",
+        title=f"Timeseries Volume per Slot 1 Jam — window 48 jam s/d {target_date}",
         xaxis=dict(title="Waktu", tickformat="%H:%M\n%d-%b"),
         yaxis=dict(title="Jumlah Tweet", rangemode="tozero"),
         legend=dict(
