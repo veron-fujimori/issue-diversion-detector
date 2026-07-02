@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from itertools import combinations
 from utils.logger import logger
+from config.settings import settings
 from db.repositories.cluster_repo import get_clusters_by_date
 from db.repositories.volume_repo import get_volumes_grouped_by_cluster
 from db.repositories.alert_repo import save_alert
@@ -58,7 +59,7 @@ def _best_lagged_correlation(
             corr = _pearson(a1, b1)
             if corr < best_corr:
                 best_corr = corr
-                best_lag = lag_slot * 4
+                best_lag = lag_slot * settings.VOLUME_INTERVAL_HOURS
 
         if lag_slot == 0:
             continue
@@ -68,7 +69,7 @@ def _best_lagged_correlation(
             corr = _pearson(a2, b2)
             if corr < best_corr:
                 best_corr = corr
-                best_lag = -(lag_slot * 4)
+                best_lag = -(lag_slot * settings.VOLUME_INTERVAL_HOURS)
     return best_corr, best_lag
 
 
