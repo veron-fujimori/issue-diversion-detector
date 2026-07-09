@@ -3,17 +3,19 @@ from db.connection import get_cursor
 from config.settings import settings
 from utils.logger import logger
 
+
 def get_volume_by_topics_and_slot(topics: list[str], slot_start: datetime) -> int:
     slot_end = slot_start + timedelta(hours=settings.VOLUME_INTERVAL_HOURS)
 
     with get_cursor() as cur:
         cur.execute(
             """
-            SELECT COUNT(*) AS tweet_count
-            FROM tweet
-            WHERE collected_for_hashtag = ANY(%s)
-              AND "timestamp" >= %s
-              AND "timestamp" <  %s
+            SELECT COUNT(DISTINCT t.tweet_id) AS tweet_count
+            FROM tweet t
+            JOIN tweet_topic tt ON tt.tweet_id = t.tweet_id
+            WHERE tt.topic = ANY(%s)
+              AND t.timestamp_utc >= %s
+              AND t.timestamp_utc <  %s
             """,
             (topics, slot_start, slot_end),
         )
@@ -30,18 +32,21 @@ def get_all_tweets_by_topics_and_date(topics: list[str], date: str) -> list[dict
     with get_cursor() as cur:
         cur.execute(
             """
-            SELECT
+            SELECT DISTINCT ON (t.tweet_id)
                 t.user_screen_name,
-                t."timestamp",
+                t.timestamp_utc AS "timestamp",
                 t.text,
                 t.likes,
                 t.retweets,
                 t.view_count,
-                NULL::timestamptz AS account_created_at,
-                NULL::integer     AS followers_count
+                u.created_at        AS account_created_at,
+                u.followers_count   AS followers_count
             FROM tweet t
-            WHERE t.collected_for_hashtag = ANY(%s)
+            JOIN tweet_topic tt ON tt.tweet_id = t.tweet_id
+            LEFT JOIN "user" u ON u.screen_name = t.user_screen_name
+            WHERE tt.topic = ANY(%s)
               AND t.collected_date = %s
+            ORDER BY t.tweet_id
             """,
             (topics, date),
         )
