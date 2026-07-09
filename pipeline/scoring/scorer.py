@@ -1,6 +1,7 @@
 from utils.logger import logger
 from db.repositories.alert_repo import Alert, update_score
 from pipeline.analysis.analyzer import AnalysisResult
+from config.settings import settings
 
 W_CORRELATION = 20
 W_SPIKE       = 15
@@ -13,7 +14,8 @@ DIVERSION_THRESHOLD = 60.0
 
 
 def _score_correlation(correlation: float) -> float:
-    normalized = max(0.0, (-correlation - 0.6) / 0.4)
+    threshold = settings.CORRELATION_THRESHOLD
+    normalized = max(0.0, (-correlation - abs(threshold)) / 0.4)
     return round(normalized * W_CORRELATION, 2)
 
 

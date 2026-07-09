@@ -38,7 +38,8 @@ class Settings(BaseSettings):
     LANG: str = ""
 
     VOLUME_INTERVAL_HOURS: int = 1
-    
+    CORRELATION_THRESHOLD: float = -0.6   # Pearson correlation cutoff (displacement candidate gate)
+
     # ── Trending archive ──
     TRENDING_BASE_URL: str = "https://archive.twitter-trending.com"
 
