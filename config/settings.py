@@ -38,10 +38,16 @@ class Settings(BaseSettings):
     LANG: str = ""
 
     VOLUME_INTERVAL_HOURS: int = 1
-    CORRELATION_THRESHOLD: float = -0.6   # Pearson correlation cutoff (displacement candidate gate)
+    CORRELATION_THRESHOLD: float = -0.2   # Pearson correlation cutoff (displacement candidate gate)
 
     # ── Trending archive ──
     TRENDING_BASE_URL: str = "https://archive.twitter-trending.com"
+
+    # ── Context checker (web search) ──
+    CONTEXT_CHECK_ENABLED: bool = True           # <— master switch
+    OPENAI_SEARCH_MODEL: str = "gpt-5.4"          # verified support web_search di Responses API
+    CONTEXT_CHECK_MAX_SUPPRESSION: float = 0.5     # cap suppression, jangan sampai 1.0
+    CONTEXT_CHECK_MIN_CONFIDENCE: float = 0.6      # di bawah ini, suppression diabaikan
 
     # ── Scweet limits ──
     SCWEET_LIMIT: int = 500               # max tweets per search job

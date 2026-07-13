@@ -1,7 +1,8 @@
+from config.settings import settings
 from utils.logger import logger
 from db.repositories.alert_repo import Alert, update_score
 from pipeline.analysis.analyzer import AnalysisResult
-from config.settings import settings
+from pipeline.context.context_checker import ContextCheckResult
 
 W_CORRELATION = 20
 W_SPIKE       = 15
@@ -14,8 +15,7 @@ DIVERSION_THRESHOLD = 60.0
 
 
 def _score_correlation(correlation: float) -> float:
-    threshold = settings.CORRELATION_THRESHOLD
-    normalized = max(0.0, (-correlation - abs(threshold)) / 0.4)
+    normalized = max(0.0, (-correlation - 0.6) / 0.4)
     return round(normalized * W_CORRELATION, 2)
 
 
@@ -28,30 +28,50 @@ def _score_ratio(ratio: float, weight: int) -> float:
     return round(min(1.0, max(0.0, ratio)) * weight, 2)
 
 
-def compute(alert: Alert, analysis: AnalysisResult) -> tuple[float, dict]:
+def _suppression_factor(context: ContextCheckResult | None) -> float:
+    if context is None or not context.grounded or not context.independent_event:
+        return 1.0
+    if context.confidence < settings.CONTEXT_CHECK_MIN_CONFIDENCE:
+        return 1.0
+    reduction = settings.CONTEXT_CHECK_MAX_SUPPRESSION * context.confidence
+    return round(1.0 - reduction, 3)
+
+
+def compute(
+    alert: Alert,
+    analysis: AnalysisResult,
+    context: ContextCheckResult | None = None,
+) -> tuple[float, dict]:
     s_correlation = _score_correlation(alert.correlation)
     s_spike       = _score_spike(alert.spike_magnitude)
     s_coordinated = _score_ratio(analysis.coordinated_ratio, W_COORDINATED)
 
-    total = round(s_correlation + s_spike + s_coordinated, 2)
+    raw_total = round(s_correlation + s_spike + s_coordinated, 2)
+    factor    = _suppression_factor(context)
+    total     = round(raw_total * factor, 2)
 
     breakdown = {
         "correlation": {
-            "score": s_correlation,
-            "max":   W_CORRELATION,
-            "raw":   round(alert.correlation, 4),
+            "score": s_correlation, "max": W_CORRELATION,
+            "raw": round(alert.correlation, 4),
         },
         "spike": {
-            "score": s_spike,
-            "max":   W_SPIKE,
-            "raw":   round(alert.spike_magnitude, 4),
+            "score": s_spike, "max": W_SPIKE,
+            "raw": round(alert.spike_magnitude, 4),
         },
         "coordinated": {
-            "score":         s_coordinated,
-            "max":           W_COORDINATED,
-            "raw":           round(analysis.coordinated_ratio, 4),
+            "score": s_coordinated, "max": W_COORDINATED,
+            "raw": round(analysis.coordinated_ratio, 4),
             "account_count": analysis.account_count,
         },
+        "context_check": {
+            "independent_event":  context.independent_event if context else None,
+            "confidence":         context.confidence if context else None,
+            "reasoning":          context.reasoning if context else None,
+            "grounded":           context.grounded if context else None,
+            "suppression_factor": factor,
+        },
+        "raw_total_before_suppression": raw_total,
         "total":            total,
         "threshold":        DIVERSION_THRESHOLD,
         "flagged":          total >= DIVERSION_THRESHOLD,
@@ -62,7 +82,11 @@ def compute(alert: Alert, analysis: AnalysisResult) -> tuple[float, dict]:
     return total, breakdown
 
 
-def run(alert: Alert, analysis: AnalysisResult) -> float:
+def run(
+    alert: Alert,
+    analysis: AnalysisResult,
+    context: ContextCheckResult | None = None,
+) -> float:
     if analysis.sample_size == 0:
         logger.warning(
             f"scorer | alert_id={alert.id} | sample_size=0 | "
@@ -70,7 +94,7 @@ def run(alert: Alert, analysis: AnalysisResult) -> float:
             f"skor hanya dari detector (maks {W_CORRELATION + W_SPIKE} poin)"
         )
 
-    total, breakdown = compute(alert, analysis)
+    total, breakdown = compute(alert, analysis, context)
 
     update_score(
         alert_id=alert.id,
@@ -80,12 +104,9 @@ def run(alert: Alert, analysis: AnalysisResult) -> float:
 
     flag = "FLAGGED" if breakdown["flagged"] else "ok"
     logger.info(
-        f"scorer | alert_id={alert.id} | "
-        f"rising='{alert.rising_cluster_label}' | "
-        f"score={total:.1f}/{DIVERSION_THRESHOLD} | "
-        f"accounts={analysis.account_count} | "
-        f"coordinated_ratio={analysis.coordinated_ratio:.3f} | "
-        f"{flag}"
+        f"scorer | alert_id={alert.id} | rising='{alert.rising_cluster_label}' | "
+        f"raw={breakdown['raw_total_before_suppression']:.1f} -> final={total:.1f}/{DIVERSION_THRESHOLD} | "
+        f"suppression={breakdown['context_check']['suppression_factor']} | {flag}"
     )
 
     return total

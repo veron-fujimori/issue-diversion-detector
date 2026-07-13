@@ -300,3 +300,24 @@ def render_score_breakdown(alert: Alert) -> None:
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
+    # ── Context checker indicator ──
+    ctx = breakdown.get("context_check")
+    if ctx and ctx.get("independent_event"):
+        factor = ctx.get("suppression_factor", 1.0)
+        raw    = breakdown.get("raw_total_before_suppression", total)
+        if factor < 1.0:
+            st.warning(
+                f"⚠️ **Skor ditekan oleh Context Checker** (faktor {factor:.2f}x)\n\n"
+                f"Skor mentah: **{raw:.1f}** → setelah suppression: **{total:.1f}**\n\n"
+                f"**Confidence LLM:** {ctx.get('confidence', 0):.2f}  |  "
+                f"**Grounded (web search valid):** {ctx.get('grounded')}\n\n"
+                f"**Alasan:** {ctx.get('reasoning', '-')}"
+            )
+        else:
+            st.caption(
+                f"ℹ️ Context checker menemukan indikasi event independen, tapi confidence "
+                f"({ctx.get('confidence', 0):.2f}) di bawah ambang minimal — skor tidak ditekan."
+            )
+    elif ctx and not ctx.get("grounded", True):
+        st.caption("⚠️ Context checker gagal melakukan web search (fail-safe, skor tidak ditekan).")

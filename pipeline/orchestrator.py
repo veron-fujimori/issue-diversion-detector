@@ -9,6 +9,7 @@ from pipeline.timeseries import timeseries
 from pipeline.detection import detector
 from pipeline.analysis import analyzer
 from pipeline.scoring import scorer
+from pipeline.context import context_checker
 
 def run_collection(
     date_start: str | None = None,
@@ -24,11 +25,11 @@ def run_collection(
  
     logger.info(f"orchestrator | ===== COLLECTION {start} → {end} =====")
  
-    # logger.info("orchestrator | [collect 1/3] trends")
-    # trends_collector.run(start, end)
+    logger.info("orchestrator | [collect 1/3] trends")
+    trends_collector.run(start, end)
  
-    # logger.info("orchestrator | [collect 2/3] tweets")
-    # tweets_collector.run(start, end)
+    logger.info("orchestrator | [collect 2/3] tweets")
+    tweets_collector.run(start, end)
  
     if include_users:
         logger.info("orchestrator | [collect 3/3] users")
@@ -114,7 +115,14 @@ def _run_analysis_and_scoring(date: str) -> None:
                 continue
 
             analysis = analyzer.run(alert, rising_cluster.topics)
-            scorer.run(alert, analysis)
+
+            # Context checker: gated oleh settings DAN sample_size
+            if settings.CONTEXT_CHECK_ENABLED and analysis.sample_size > 0:
+                context = context_checker.run(alert, rising_cluster.topics)
+            else:
+                context = None
+
+            scorer.run(alert, analysis, context)
             succeeded += 1
 
         except Exception as e:
