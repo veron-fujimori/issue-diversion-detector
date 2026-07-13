@@ -13,9 +13,22 @@ assert _TOTAL_WEIGHT == 100, f"Total bobot harus 100, sekarang {_TOTAL_WEIGHT}."
 
 DIVERSION_THRESHOLD = 60.0
 
+# Titik nol skor korelasi WAJIB sama dengan gate deteksi di detector.py.
+# Sebelumnya floor di-hardcode -0.6 terpisah dari settings.CORRELATION_THRESHOLD
+# (-0.2) yang dipakai detector.py sebagai gate -> alert dengan korelasi antara
+# -0.2 dan -0.6 lolos deteksi tapi selalu dapat 0 poin di sini. Dengan floor
+# = settings.CORRELATION_THRESHOLD, dua ambang itu sekarang satu sumber kebenaran.
+_CORR_SCORE_FLOOR   = settings.CORRELATION_THRESHOLD   # skor mulai dari titik gate
+_CORR_SCORE_CEILING = -1.0                              # korelasi negatif sempurna
+_CORR_SCORE_SPAN    = _CORR_SCORE_FLOOR - _CORR_SCORE_CEILING
+assert _CORR_SCORE_SPAN > 0, (
+    f"CORRELATION_THRESHOLD ({_CORR_SCORE_FLOOR}) harus > -1.0 supaya span skor valid."
+)
+
 
 def _score_correlation(correlation: float) -> float:
-    normalized = max(0.0, (-correlation - 0.6) / 0.4)
+    normalized = (_CORR_SCORE_FLOOR - correlation) / _CORR_SCORE_SPAN
+    normalized = min(1.0, max(0.0, normalized))
     return round(normalized * W_CORRELATION, 2)
 
 
@@ -54,6 +67,7 @@ def compute(
         "correlation": {
             "score": s_correlation, "max": W_CORRELATION,
             "raw": round(alert.correlation, 4),
+            "floor": _CORR_SCORE_FLOOR, "ceiling": _CORR_SCORE_CEILING,
         },
         "spike": {
             "score": s_spike, "max": W_SPIKE,
