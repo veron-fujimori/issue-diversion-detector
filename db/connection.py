@@ -35,7 +35,7 @@ def init_pool(min_conn: int = 2, max_conn: int = 3) -> None:
         finally:
             _pool.putconn(conn)
     except psycopg2.OperationalError as e:
-        logger.error(f"Gagal konek ke database: {e}")
+        logger.error(f"Failed to connect to database: {e}")
         raise
 
 def _get_pool() -> pg_pool.ThreadedConnectionPool:
