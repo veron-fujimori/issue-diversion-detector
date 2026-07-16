@@ -1,23 +1,19 @@
 import json
 from dataclasses import dataclass
-from typing import Union
-from openai import OpenAI, APIError, RateLimitError
+from openai import APIError, OpenAI, RateLimitError
 from config.settings import settings
 from utils.logger import logger
 
-
 @dataclass
 class LLMResponse:
-    content: Union[str, dict]
+    content: str | dict
     model: str
-
 
 @dataclass
 class SearchLLMResponse:
-    content: Union[str, dict]
+    content: str | dict
     model: str
-    grounded: bool   # True kalau web_search_call beneran terjadi di response
-
+    grounded: bool
 
 class LLMClient:
     def __init__(self) -> None:
@@ -59,10 +55,6 @@ class LLMClient:
             raise
 
     def chat_with_search(self, prompt: str, system: str) -> SearchLLMResponse:
-        """
-        Dipakai khusus context_checker — butuh grounding via web search asli,
-        bukan tebakan dari memori parametrik model.
-        """
         text = None
         try:
             response = self._client.responses.create(
@@ -78,7 +70,6 @@ class LLMClient:
             text = response.output_text
             content = json.loads(text)
 
-            # Verifikasi web search BENERAN terjadi, bukan model jawab dari memori
             grounded = any(
                 getattr(item, "type", None) == "web_search_call"
                 for item in response.output
@@ -86,8 +77,8 @@ class LLMClient:
 
             if not grounded:
                 logger.warning(
-                    "LLM | chat_with_search | model tidak melakukan web_search_call — "
-                    "jawaban kemungkinan dari memori parametrik, bukan hasil grounding"
+                    "LLM | chat_with_search | model did not perform a web_search_call — "
+                    "response is likely from parametric memory, not grounded"
                 )
 
             logger.debug(

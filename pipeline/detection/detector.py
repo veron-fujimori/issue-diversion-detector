@@ -1,23 +1,22 @@
 from datetime import datetime, timedelta, timezone
 from itertools import combinations
-from utils.logger import logger
 from config.settings import settings
+from db.repositories.alert_repo import save_alert
 from db.repositories.cluster_repo import get_clusters_by_date
 from db.repositories.volume_repo import get_volumes_grouped_by_cluster
-from db.repositories.alert_repo import save_alert
+from utils.logger import logger
 
 WIB = timezone(timedelta(hours=7))
 WINDOW_HOURS = 48
 LAG_SLOTS = [0, 1, 2, 3]
 CORRELATION_THRESHOLD = settings.CORRELATION_THRESHOLD
-SPIKE_RATIO_THRESHOLD = 2.0
+SPIKE_RATIO_THRESHOLD = settings.SPIKE_RATIO_THRESHOLD
 MIN_DATA_POINTS = 6
 CORR_WINDOW_HOURS = 12
 
-
 def _pearson(x: list[float], y: list[float]) -> float:
     n = len(x)
-    if n < 2:
+    if n < 2 or len(y) != n:
         return 0.0
     mean_x = sum(x) / n
     mean_y = sum(y) / n
@@ -28,7 +27,6 @@ def _pearson(x: list[float], y: list[float]) -> float:
         return 0.0
     return num / (den_x * den_y)
 
-
 def _apply_lag_pair(a, b, lag):
     if lag == 0:
         return a, b
@@ -36,7 +34,6 @@ def _apply_lag_pair(a, b, lag):
     if lag >= n:
         return [], []
     return a[: n - lag], b[lag:]
-
 
 def _spike_ratio(series):
     if not series or max(series) == 0:
@@ -46,24 +43,17 @@ def _spike_ratio(series):
         return 0.0
     return max(series) / mean_val
 
-
 def _peak_slot_index(series):
     if not series or max(series) == 0:
         return 0
     return series.index(max(series))
 
-
 def _trim_around_peak(series_a, series_b, peak_idx):
-    """Potong kedua series ke window sama panjang di sekitar peak_idx.
-    hi dibatasi oleh series TERPENDEK — bug sebelumnya cuma cek len(series_a),
-    bisa bikin series_a & series_b keluar dengan panjang beda dan index waktu
-    jadi gak sejajar lagi setelah di-zip di _pearson."""
     half_window = CORR_WINDOW_HOURS // settings.VOLUME_INTERVAL_HOURS
     shortest = min(len(series_a), len(series_b))
     lo = max(0, peak_idx - half_window)
     hi = min(shortest, peak_idx + half_window + 1)
     return series_a[lo:hi], series_b[lo:hi]
-
 
 def _best_lagged_correlation(series_a, series_b):
     best_corr = 1.0
@@ -83,15 +73,9 @@ def _best_lagged_correlation(series_a, series_b):
                 best_corr, best_lag = corr, -(lag_slot * settings.VOLUME_INTERVAL_HOURS)
     return best_corr, best_lag
 
-
 def _merge_series_by_label(
     clusters_today, clusters_prev, volumes_by_cluster_id: dict
 ) -> tuple[dict[str, list[float]], dict[str, int]]:
-    """
-    Gabungkan volume dari cluster_id hari ini + kemarin yang punya cluster_label
-    sama, jadi satu series kontinu terurut waktu. label_to_today_id dipakai
-    untuk save_alert (FK butuh id yang real, kita pakai id milik hari ini).
-    """
     label_to_ids: dict[str, list[int]] = {}
     label_to_today_id: dict[str, int] = {}
 
@@ -99,7 +83,7 @@ def _merge_series_by_label(
         label_to_ids.setdefault(c.cluster_label, []).append(c.id)
     for c in clusters_today:
         label_to_ids.setdefault(c.cluster_label, []).append(c.id)
-        label_to_today_id[c.cluster_label] = c.id  # id milik hari ini menang
+        label_to_today_id[c.cluster_label] = c.id
 
     series_map: dict[str, list[float]] = {}
     for label, ids in label_to_ids.items():
@@ -111,7 +95,6 @@ def _merge_series_by_label(
             series_map[label] = [merged[t] for t in sorted(merged)]
 
     return series_map, label_to_today_id
-
 
 def run(date: str) -> None:
     clusters_today = get_clusters_by_date(date)
@@ -129,7 +112,7 @@ def run(date: str) -> None:
 
     logger.info(
         f"detector | date={date} | window {window_start} -> {day_end} | "
-        f"{len(clusters_today)} cluster hari ini, {len(clusters_prev)} cluster kemarin"
+        f"{len(clusters_today)} clusters today, {len(clusters_prev)} clusters yesterday"
     )
 
     volumes_by_cluster_id = get_volumes_grouped_by_cluster(start=window_start, end=day_end)

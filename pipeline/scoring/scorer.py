@@ -1,45 +1,40 @@
 from config.settings import settings
-from utils.logger import logger
 from db.repositories.alert_repo import Alert, update_score
 from pipeline.analysis.analyzer import AnalysisResult
 from pipeline.context.context_checker import ContextCheckResult
+from utils.logger import logger
 
 W_CORRELATION = 20
 W_SPIKE       = 15
 W_COORDINATED = 65
 
 _TOTAL_WEIGHT = W_CORRELATION + W_SPIKE + W_COORDINATED
-assert _TOTAL_WEIGHT == 100, f"Total bobot harus 100, sekarang {_TOTAL_WEIGHT}."
+assert _TOTAL_WEIGHT == 100, f"Total weight must be 100, currently {_TOTAL_WEIGHT}."
 
 DIVERSION_THRESHOLD = 60.0
 
-# Titik nol skor korelasi WAJIB sama dengan gate deteksi di detector.py.
-# Sebelumnya floor di-hardcode -0.6 terpisah dari settings.CORRELATION_THRESHOLD
-# (-0.2) yang dipakai detector.py sebagai gate -> alert dengan korelasi antara
-# -0.2 dan -0.6 lolos deteksi tapi selalu dapat 0 poin di sini. Dengan floor
-# = settings.CORRELATION_THRESHOLD, dua ambang itu sekarang satu sumber kebenaran.
-_CORR_SCORE_FLOOR   = settings.CORRELATION_THRESHOLD   # skor mulai dari titik gate
-_CORR_SCORE_CEILING = -1.0                              # korelasi negatif sempurna
+_CORR_SCORE_FLOOR   = settings.CORRELATION_THRESHOLD
+_CORR_SCORE_CEILING = -1.0
 _CORR_SCORE_SPAN    = _CORR_SCORE_FLOOR - _CORR_SCORE_CEILING
 assert _CORR_SCORE_SPAN > 0, (
-    f"CORRELATION_THRESHOLD ({_CORR_SCORE_FLOOR}) harus > -1.0 supaya span skor valid."
+    f"CORRELATION_THRESHOLD ({_CORR_SCORE_FLOOR}) must be > -1.0 for a valid score span."
 )
 
+_SPIKE_SCORE_FLOOR   = settings.SPIKE_RATIO_THRESHOLD
+_SPIKE_SCORE_CEILING = _SPIKE_SCORE_FLOOR + 8.0
+_SPIKE_SCORE_SPAN    = _SPIKE_SCORE_CEILING - _SPIKE_SCORE_FLOOR
 
 def _score_correlation(correlation: float) -> float:
     normalized = (_CORR_SCORE_FLOOR - correlation) / _CORR_SCORE_SPAN
     normalized = min(1.0, max(0.0, normalized))
     return round(normalized * W_CORRELATION, 2)
 
-
 def _score_spike(spike_magnitude: float) -> float:
-    normalized = min(1.0, max(0.0, (spike_magnitude - 2.0) / 8.0))
+    normalized = min(1.0, max(0.0, (spike_magnitude - _SPIKE_SCORE_FLOOR) / _SPIKE_SCORE_SPAN))
     return round(normalized * W_SPIKE, 2)
-
 
 def _score_ratio(ratio: float, weight: int) -> float:
     return round(min(1.0, max(0.0, ratio)) * weight, 2)
-
 
 def _suppression_factor(context: ContextCheckResult | None) -> float:
     if context is None or not context.grounded or not context.independent_event:
@@ -48,7 +43,6 @@ def _suppression_factor(context: ContextCheckResult | None) -> float:
         return 1.0
     reduction = settings.CONTEXT_CHECK_MAX_SUPPRESSION * context.confidence
     return round(1.0 - reduction, 3)
-
 
 def compute(
     alert: Alert,
@@ -95,7 +89,6 @@ def compute(
 
     return total, breakdown
 
-
 def run(
     alert: Alert,
     analysis: AnalysisResult,
@@ -105,7 +98,7 @@ def run(
         logger.warning(
             f"scorer | alert_id={alert.id} | sample_size=0 | "
             f"rising='{alert.rising_cluster_label}' | "
-            f"skor hanya dari detector (maks {W_CORRELATION + W_SPIKE} poin)"
+            f"score comes from detector only (max {W_CORRELATION + W_SPIKE} points)"
         )
 
     total, breakdown = compute(alert, analysis, context)

@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional
+import json
 from db.connection import get_cursor
 from utils.logger import logger
-import json
 
 @dataclass
 class Alert:
@@ -17,6 +17,21 @@ class Alert:
     spike_magnitude: float
     confidence_score: Optional[float]
     score_breakdown: Optional[dict]
+
+def _row_to_alert(row: dict) -> Alert:
+    return Alert(
+        id=row["id"],
+        detected_at=str(row["detected_at"]),
+        rising_cluster_id=row["rising_cluster_id"],
+        rising_cluster_label=row["rising_cluster_label"],
+        falling_cluster_id=row["falling_cluster_id"],
+        falling_cluster_label=row["falling_cluster_label"],
+        lag_hours=row["lag_hours"],
+        correlation=row["correlation"],
+        spike_magnitude=row["spike_magnitude"],
+        confidence_score=row["confidence_score"],
+        score_breakdown=dict(row["score_breakdown"]) if row["score_breakdown"] else None,
+    )
 
 def save_alert(
     detected_at: str,
@@ -93,22 +108,7 @@ def get_alerts_by_date(detected_at: str) -> list[Alert]:
         )
         rows = cur.fetchall()
 
-    return [
-        Alert(
-            id=row["id"],
-            detected_at=str(row["detected_at"]),
-            rising_cluster_id=row["rising_cluster_id"],
-            rising_cluster_label=row["rising_cluster_label"],
-            falling_cluster_id=row["falling_cluster_id"],
-            falling_cluster_label=row["falling_cluster_label"],
-            lag_hours=row["lag_hours"],
-            correlation=row["correlation"],
-            spike_magnitude=row["spike_magnitude"],
-            confidence_score=row["confidence_score"],
-            score_breakdown=dict(row["score_breakdown"]) if row["score_breakdown"] else None,
-        )
-        for row in rows
-    ]
+    return [_row_to_alert(row) for row in rows]
 
 def get_alerts_pending_scoring(detected_at: str) -> list[Alert]:
     with get_cursor() as cur:
@@ -129,19 +129,4 @@ def get_alerts_pending_scoring(detected_at: str) -> list[Alert]:
         )
         rows = cur.fetchall()
 
-    return [
-        Alert(
-            id=row["id"],
-            detected_at=str(row["detected_at"]),
-            rising_cluster_id=row["rising_cluster_id"],
-            rising_cluster_label=row["rising_cluster_label"],
-            falling_cluster_id=row["falling_cluster_id"],
-            falling_cluster_label=row["falling_cluster_label"],
-            lag_hours=row["lag_hours"],
-            correlation=row["correlation"],
-            spike_magnitude=row["spike_magnitude"],
-            confidence_score=row["confidence_score"],
-            score_breakdown=dict(row["score_breakdown"]) if row["score_breakdown"] else None,
-        )
-        for row in rows
-    ]
+    return [_row_to_alert(row) for row in rows]

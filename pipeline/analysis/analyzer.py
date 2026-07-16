@@ -1,10 +1,10 @@
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 from db.repositories.alert_repo import Alert
 from db.repositories.tweet_repo import get_all_tweets_by_topics_and_date
 from utils.logger import logger
@@ -25,7 +25,6 @@ LOW_FOLLOWERS_THRESHOLD   = 50
 TOTAL_CONDITIONS          = 5
 MIN_SCORE_FOR_AUDIT_TRAIL = 0.4
 
-
 @dataclass
 class AnalysisResult:
     alert_id: int
@@ -34,12 +33,10 @@ class AnalysisResult:
     account_count: int           = 0
     flagged_accounts: list[dict] = field(default_factory=list)
 
-
 def _stem(word: str) -> str:
     if word not in _STEM_CACHE:
         _STEM_CACHE[word] = _STEMMER.stem(word)
     return _STEM_CACHE[word]
-
 
 def _clean_text(text: str) -> str:
     text   = _HASHTAG_MENTION_PATTERN.sub("", text.lower())
@@ -49,7 +46,6 @@ def _clean_text(text: str) -> str:
         if t.isalpha() and t not in _STOPWORDS_SET
     ]
     return " ".join(tokens)
-
 
 def _find_similar_pairs(texts: list[str], screen_names: list[str]) -> list[int]:
     n           = len(texts)
@@ -76,7 +72,6 @@ def _find_similar_pairs(texts: list[str], screen_names: list[str]) -> list[int]:
 
     return match_count
 
-
 def _compute_burst_membership(timestamps: list) -> list[bool]:
     n        = len(timestamps)
     in_burst = [False] * n
@@ -93,7 +88,6 @@ def _compute_burst_membership(timestamps: list) -> list[bool]:
                 in_burst[k] = True
     return in_burst
 
-
 def _is_low_engagement(tweet: dict) -> bool | None:
     views = tweet["view_count"] or 0
     if views < MIN_VIEWS_FOR_ENGAGEMENT:
@@ -102,7 +96,6 @@ def _is_low_engagement(tweet: dict) -> bool | None:
     retweets = tweet["retweets"] or 0
     return (likes + retweets) / views < LOW_ENGAGEMENT_RATE
 
-
 def _is_new_account(created_at, reference_date: str) -> bool:
     if created_at is None:
         return False
@@ -110,12 +103,10 @@ def _is_new_account(created_at, reference_date: str) -> bool:
     cutoff = ref - timedelta(days=NEW_ACCOUNT_DAYS)
     return created_at.date() >= cutoff
 
-
 def _is_low_followers(followers_count) -> bool:
     if followers_count is None:
         return False
     return followers_count < LOW_FOLLOWERS_THRESHOLD
-
 
 def run(alert: Alert, rising_topics: list[str]) -> AnalysisResult:
     tweets = get_all_tweets_by_topics_and_date(rising_topics, alert.detected_at)
