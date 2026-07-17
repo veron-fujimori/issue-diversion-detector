@@ -1,6 +1,8 @@
 from datetime import date, datetime, timedelta, timezone
+
 import plotly.graph_objects as go
 import streamlit as st
+
 from db.repositories.alert_repo import Alert
 from db.repositories.cluster_repo import get_clusters_by_date
 from db.repositories.volume_repo import get_volumes_grouped_by_cluster
@@ -19,9 +21,7 @@ PALETTE = [
 ]
 
 
-# ── FILTERS ──────────────────────────────────────────────────────────
-
-def date_picker(label: str = "Tanggal deteksi", default_offset_days: int = 1) -> str:
+def date_picker(label: str = "Detection date", default_offset_days: int = 1) -> str:
     default_date = date.today() - timedelta(days=default_offset_days)
     selected = st.date_input(label, value=default_date, max_value=date.today())
     return selected.isoformat()
@@ -29,12 +29,12 @@ def date_picker(label: str = "Tanggal deteksi", default_offset_days: int = 1) ->
 
 def alert_selector(alerts: list[Alert]) -> Alert | None:
     if not alerts:
-        st.info("Tidak ada alert untuk tanggal ini.")
+        st.info("No alerts for this date.")
         return None
 
     def _format(a: Alert) -> str:
         score = f"{a.confidence_score:.1f}" if a.confidence_score is not None else "-"
-        flag  = "FLAGGED" if (a.confidence_score or 0) >= 60 else "ok"
+        flag  = "FLAGGED" if (a.confidence_score or 0) >= 60 else "UNFLAGGED"
         return f"#{a.id} | {a.rising_cluster_label} -> {a.falling_cluster_label} | score={score} ({flag})"
 
     default_index = 0
@@ -45,12 +45,10 @@ def alert_selector(alerts: list[Alert]) -> Alert | None:
                 default_index = i
                 break
 
-    chosen = st.selectbox("Pilih alert", options=alerts, index=default_index, format_func=_format)
+    chosen = st.selectbox("Select alert", options=alerts, index=default_index, format_func=_format)
     st.session_state["selected_alert_id"] = chosen.id
     return chosen
 
-
-# ── WINDOW ───────────────────────────────────────────────────────────
 
 def _window_for_date(target_date: str) -> tuple[datetime, datetime]:
     day_end = datetime.fromisoformat(target_date).replace(
@@ -59,14 +57,7 @@ def _window_for_date(target_date: str) -> tuple[datetime, datetime]:
     return day_end - timedelta(hours=WINDOW_HOURS), day_end
 
 
-# ── VOLUME EXPLORER ───────────────────────────────────────────────────
-
 def render_volume_bar(clusters_data: list[dict]) -> None:
-    """
-    Bar chart: total volume tweet per cluster untuk periode yang dipilih.
-    Diurutkan descending supaya cluster paling aktif langsung terlihat.
-    Tujuan: orientasi cepat — siapa yang ramai, siapa yang sepi.
-    """
     sorted_data = sorted(clusters_data, key=lambda x: x["total"], reverse=True)
 
     fig = go.Figure(go.Bar(
@@ -78,9 +69,9 @@ def render_volume_bar(clusters_data: list[dict]) -> None:
     ))
 
     fig.update_layout(
-        title="Total Volume Tweet per Cluster",
+        title="Total Tweets by Cluster",
         xaxis=dict(title="Cluster", tickangle=-30),
-        yaxis=dict(title="Total Tweet", rangemode="tozero"),
+        yaxis=dict(title="Total Tweets", rangemode="tozero"),
         height=400,
         margin=dict(b=120),
     )
@@ -88,14 +79,7 @@ def render_volume_bar(clusters_data: list[dict]) -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
-def render_volume_timeseries(clusters_data: list[dict], target_date: str) -> None:
-    """
-    Multi-line timeseries: volume per slot 1 jam, nilai absolut.
-    Semua cluster dalam satu chart — user bisa klik legend untuk
-    hide/show cluster tertentu sehingga perbandingan skala bisa
-    diatur sendiri tanpa perlu normalisasi.
-    Tujuan: lihat KAPAN pergerakan terjadi dan siapa yang bergerak.
-    """
+def render_volume_timeseries(clusters_data: list[dict]) -> None:
     fig = go.Figure()
 
     for i, d in enumerate(clusters_data):
@@ -110,9 +94,9 @@ def render_volume_timeseries(clusters_data: list[dict], target_date: str) -> Non
         ))
 
     fig.update_layout(
-        title=f"Timeseries Volume per Slot 1 Jam — window 48 jam s/d {target_date}",
-        xaxis=dict(title="Waktu", tickformat="%H:%M\n%d-%b"),
-        yaxis=dict(title="Jumlah Tweet", rangemode="tozero"),
+        title="Hourly Volume Timeseries",
+        xaxis=dict(title="Time", tickformat="%H:%M\n%d-%b"),
+        yaxis=dict(title="Tweet Count", rangemode="tozero"),
         legend=dict(
             orientation="v",
             yanchor="top",
@@ -125,28 +109,21 @@ def render_volume_timeseries(clusters_data: list[dict], target_date: str) -> Non
     )
 
     st.plotly_chart(fig, use_container_width=True)
-    st.caption("Tip: klik nama cluster di legenda untuk sembunyikan/tampilkan.")
 
 
 def render_volume_explorer(target_date: str) -> None:
-    """
-    Entry point tab Volume Explorer.
-    Ambil data sekali, render dua chart: bar total + timeseries.
-    """
     clusters = get_clusters_by_date(target_date)
 
     if not clusters:
         st.info(
-            f"Tidak ada cluster untuk tanggal {target_date}. "
-            "Cek apakah clustering pipeline sudah dijalankan."
+            f"No clusters for {target_date}. "
+            "Check whether the clustering pipeline has been run."
         )
         return
 
     window_start, window_end = _window_for_date(target_date)
     volumes = get_volumes_grouped_by_cluster(start=window_start, end=window_end)
 
-    # Susun data per cluster — include cluster tanpa volume (total=0)
-    # supaya terlihat cluster mana yang memang tidak punya data
     clusters_data = []
     for c in clusters:
         vols  = sorted(volumes.get(c.id, []), key=lambda v: v.slot_start)
@@ -163,38 +140,29 @@ def render_volume_explorer(target_date: str) -> None:
     all_zero = all(d["total"] == 0 for d in clusters_data)
     if all_zero:
         st.warning(
-            "Semua slot berisi 0 tweet. Kemungkinan ada mismatch antara "
-            "nilai di kolom `topics` (tabel `clusters`) dengan "
-            "`collected_for_hashtag` (tabel `tweet`). "
-            "Jalankan query berikut di DB untuk konfirmasi:\n\n"
+            "All slots have 0 tweets. This likely means a mismatch between "
+            "`clusters.topics` and `tweet_topic.topic`. "
+            "Run the following queries to confirm:\n\n"
             "```sql\n"
-            "SELECT DISTINCT collected_for_hashtag FROM tweet LIMIT 20;\n"
+            "SELECT DISTINCT topic FROM tweet_topic LIMIT 20;\n"
             "SELECT DISTINCT unnest(topics) FROM clusters LIMIT 20;\n"
             "```"
         )
 
-    st.caption(f"{len(clusters_data)} cluster | window 48 jam s/d {target_date}")
+    st.caption(f"{len(clusters_data)} clusters")
 
     render_volume_bar(clusters_data)
 
     st.divider()
 
-    # Hanya render timeseries untuk cluster yang punya slot data
     clusters_with_slots = [d for d in clusters_data if d["slots"]]
     if clusters_with_slots:
-        render_volume_timeseries(clusters_with_slots, target_date)
+        render_volume_timeseries(clusters_with_slots)
     else:
-        st.info("Tidak ada data timeseries untuk ditampilkan.")
+        st.info("No timeseries data to display.")
 
-
-# ── TAB DETAIL ────────────────────────────────────────────────────────
 
 def render_displacement_chart(alert: Alert) -> None:
-    """
-    Dual-axis timeseries: rising vs falling cluster dalam window 48 jam.
-    Dua sumbu Y supaya perbedaan skala tidak mendistorsi pola visual.
-    Ini chart utama untuk membuktikan pola displacement ke audiens.
-    """
     window_start, window_end = _window_for_date(alert.detected_at)
     volumes = get_volumes_grouped_by_cluster(start=window_start, end=window_end)
 
@@ -202,7 +170,7 @@ def render_displacement_chart(alert: Alert) -> None:
     falling_vols = sorted(volumes.get(alert.falling_cluster_id, []), key=lambda v: v.slot_start)
 
     if not rising_vols and not falling_vols:
-        st.warning("Tidak ada data volume untuk window ini.")
+        st.warning("No volume data for this window.")
         return
 
     fig = go.Figure()
@@ -224,8 +192,8 @@ def render_displacement_chart(alert: Alert) -> None:
     ))
 
     fig.update_layout(
-        title="Pola Displacement Volume (window 48 jam)",
-        xaxis=dict(title="Waktu", tickformat="%H:%M\n%d-%b"),
+        title="Volume Displacement Pattern (48-hour window)",
+        xaxis=dict(title="Time", tickformat="%H:%M\n%d-%b"),
         yaxis=dict(
             title=dict(text=alert.rising_cluster_label, font=dict(color="#E45756")),
             tickfont=dict(color="#E45756"),
@@ -246,13 +214,8 @@ def render_displacement_chart(alert: Alert) -> None:
 
 
 def render_score_breakdown(alert: Alert) -> None:
-    """
-    Horizontal stacked bar: skor aktual vs sisa-menuju-maksimum per komponen.
-    Membuktikan ke audiens bahwa skor bukan black box —
-    setiap komponen terlihat kontribusinya secara eksplisit.
-    """
     if not alert.score_breakdown:
-        st.info("Alert ini belum di-scoring.")
+        st.info("This alert has not been scored yet.")
         return
 
     breakdown = alert.score_breakdown
@@ -270,7 +233,7 @@ def render_score_breakdown(alert: Alert) -> None:
 
     fig.add_trace(go.Bar(
         y=labels, x=scores,
-        name="Skor diperoleh",
+        name="Score achieved",
         orientation="h",
         marker_color="#E45756",
         text=[f"{s:.1f}" for s in scores],
@@ -279,7 +242,7 @@ def render_score_breakdown(alert: Alert) -> None:
 
     fig.add_trace(go.Bar(
         y=labels, x=[m - s for m, s in zip(maxes, scores)],
-        name="Sisa menuju maks",
+        name="Remaining to max",
         orientation="h",
         marker_color="#2a2a2a",
     ))
@@ -291,33 +254,32 @@ def render_score_breakdown(alert: Alert) -> None:
     fig.update_layout(
         title=(
             f"Score Breakdown — {total:.1f} / {thresh:.0f} "
-            f"{'🔴 FLAGGED' if flagged else '✓ di bawah threshold'}"
+            f"{'🔴 FLAGGED' if flagged else '✓ below threshold'}"
         ),
         barmode="stack",
-        xaxis=dict(title="Poin", range=[0, 100]),
+        xaxis=dict(title="Points", range=[0, 100]),
         height=340,
         legend=dict(orientation="h", yanchor="bottom", y=-0.3),
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # ── Context checker indicator ──
     ctx = breakdown.get("context_check")
     if ctx and ctx.get("independent_event"):
         factor = ctx.get("suppression_factor", 1.0)
         raw    = breakdown.get("raw_total_before_suppression", total)
         if factor < 1.0:
             st.warning(
-                f"⚠️ **Skor ditekan oleh Context Checker** (faktor {factor:.2f}x)\n\n"
-                f"Skor mentah: **{raw:.1f}** → setelah suppression: **{total:.1f}**\n\n"
-                f"**Confidence LLM:** {ctx.get('confidence', 0):.2f}  |  "
-                f"**Grounded (web search valid):** {ctx.get('grounded')}\n\n"
-                f"**Alasan:** {ctx.get('reasoning', '-')}"
+                f"⚠️ **Score suppressed by Context Checker** (factor {factor:.2f}x)\n\n"
+                f"Raw score: **{raw:.1f}** → after suppression: **{total:.1f}**\n\n"
+                f"**LLM confidence:** {ctx.get('confidence', 0):.2f}  |  "
+                f"**Grounded (valid web search):** {ctx.get('grounded')}\n\n"
+                f"**Reasoning:** {ctx.get('reasoning', '-')}"
             )
         else:
             st.caption(
-                f"ℹ️ Context checker menemukan indikasi event independen, tapi confidence "
-                f"({ctx.get('confidence', 0):.2f}) di bawah ambang minimal — skor tidak ditekan."
+                f"ℹ️ Context checker found signs of an independent event, but confidence "
+                f"({ctx.get('confidence', 0):.2f}) is below the minimum threshold — score not suppressed."
             )
     elif ctx and not ctx.get("grounded", True):
-        st.caption("⚠️ Context checker gagal melakukan web search (fail-safe, skor tidak ditekan).")
+        st.caption("⚠️ Context checker failed to perform a web search (fail-safe, score not suppressed).")
