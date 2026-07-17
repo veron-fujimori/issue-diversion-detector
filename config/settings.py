@@ -39,6 +39,8 @@ class Settings(BaseSettings):
 
     VOLUME_INTERVAL_HOURS: int = 1
     CORRELATION_THRESHOLD: float = -0.2   # Pearson correlation cutoff (displacement candidate gate)
+    SPIKE_RATIO_THRESHOLD: float = 2.0    # max/mean volume ratio to qualify as a "spike" (detector gate + scorer floor)
+    SPIKE_SCORE_RANGE: float = 8.0        # range above SPIKE_RATIO_THRESHOLD over which the spike score saturates to 1.0
 
     # ── Trending archive ──
     TRENDING_BASE_URL: str = "https://archive.twitter-trending.com"

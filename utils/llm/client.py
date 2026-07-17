@@ -1,9 +1,40 @@
 import json
+import re
 from dataclasses import dataclass
 from typing import Union
 from openai import OpenAI, APIError, RateLimitError
 from config.settings import settings
 from utils.logger import logger
+
+_JSON_FENCE_PATTERN = re.compile(r"```(?:json)?(.*?)```", re.DOTALL)
+_JSON_OBJECT_PATTERN = re.compile(r"\{[^}]*\}")
+
+
+def _extract_json(text: str) -> dict:
+    """
+    web_search-grounded responses kadang gak murni JSON — bisa ada code fence,
+    kutipan sumber, atau teks tambahan di sekitar objek JSON-nya walau prompt
+    sudah minta "HANYA JSON". json.loads(text) langsung gampang gagal kalau
+    formatnya sedikit meleset. Coba parse langsung dulu, baru fallback ke
+    strip code fence / ekstrak blok {...} pertama.
+    """
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    fence_match = _JSON_FENCE_PATTERN.search(text)
+    if fence_match:
+        try:
+            return json.loads(fence_match.group(1).strip())
+        except json.JSONDecodeError:
+            pass
+
+    object_match = _JSON_OBJECT_PATTERN.search(text)
+    if object_match:
+        return json.loads(object_match.group(0))
+
+    raise json.JSONDecodeError("no JSON object found in text", text, 0)
 
 
 @dataclass
@@ -76,7 +107,7 @@ class LLMClient:
             )
 
             text = response.output_text
-            content = json.loads(text)
+            content = _extract_json(text)
 
             # Verifikasi web search BENERAN terjadi, bukan model jawab dari memori
             grounded = any(

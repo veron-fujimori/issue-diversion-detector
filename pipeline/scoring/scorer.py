@@ -33,7 +33,8 @@ def _score_correlation(correlation: float) -> float:
 
 
 def _score_spike(spike_magnitude: float) -> float:
-    normalized = min(1.0, max(0.0, (spike_magnitude - 2.0) / 8.0))
+    floor = settings.SPIKE_RATIO_THRESHOLD
+    normalized = min(1.0, max(0.0, (spike_magnitude - floor) / settings.SPIKE_SCORE_RANGE))
     return round(normalized * W_SPIKE, 2)
 
 
