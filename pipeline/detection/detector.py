@@ -57,12 +57,15 @@ def _trim_around_peak(series_a, series_b, peak_idx):
     """Potong kedua series ke window sama panjang di sekitar peak_idx.
     hi dibatasi oleh series TERPENDEK — bug sebelumnya cuma cek len(series_a),
     bisa bikin series_a & series_b keluar dengan panjang beda dan index waktu
-    jadi gak sejajar lagi setelah di-zip di _pearson."""
+    jadi gak sejajar lagi setelah di-zip di _pearson.
+
+    Balikin juga (lo, hi) supaya caller bisa map index balik ke timestamp asli
+    di `timeline` (dipakai untuk isi alerts.window_start/window_end)."""
     half_window = CORR_WINDOW_HOURS // settings.VOLUME_INTERVAL_HOURS
     shortest = min(len(series_a), len(series_b))
     lo = max(0, peak_idx - half_window)
     hi = min(shortest, peak_idx + half_window + 1)
-    return series_a[lo:hi], series_b[lo:hi]
+    return series_a[lo:hi], series_b[lo:hi], lo, hi
 
 
 def _best_lagged_correlation(series_a, series_b):
@@ -86,11 +89,21 @@ def _best_lagged_correlation(series_a, series_b):
 
 def _merge_series_by_label(
     clusters_today, clusters_prev, volumes_by_cluster_id: dict
-) -> tuple[dict[str, list[float]], dict[str, int]]:
+) -> tuple[dict[str, list[float]], dict[str, int], list]:
     """
     Gabungkan volume dari cluster_id hari ini + kemarin yang punya cluster_label
     sama, jadi satu series kontinu terurut waktu. label_to_today_id dipakai
     untuk save_alert (FK butuh id yang real, kita pakai id milik hari ini).
+
+    Semua label di-reindex ke SATU `timeline` bersama (union semua slot_start
+    yang muncul di window ini), bukan cuma di-sort sesuai slot_start-nya
+    sendiri-sendiri. Sebelumnya label yang cuma ada hari ini (24 slot) dan
+    label yang ada 2 hari (48 slot) dibandingkan pakai index yang sama di
+    _trim_around_peak/_pearson — index yang sama itu ternyata nunjuk ke jam
+    yang beda di real time, jadi korelasi dihitung dari data yang gak
+    simultan tanpa ketahuan. Dengan timeline bersama + 0-fill di slot yang
+    gak ada datanya, index i sekarang selalu nunjuk jam yang sama untuk
+    semua label yang dibandingkan.
     """
     label_to_ids: dict[str, list[int]] = {}
     label_to_today_id: dict[str, int] = {}
@@ -101,16 +114,24 @@ def _merge_series_by_label(
         label_to_ids.setdefault(c.cluster_label, []).append(c.id)
         label_to_today_id[c.cluster_label] = c.id  # id milik hari ini menang
 
-    series_map: dict[str, list[float]] = {}
+    label_slot_counts: dict[str, dict] = {}
+    all_slots: set = set()
     for label, ids in label_to_ids.items():
         merged: dict = {}
         for cid in ids:
             for v in volumes_by_cluster_id.get(cid, []):
                 merged[v.slot_start] = merged.get(v.slot_start, 0.0) + v.tweet_count
         if merged:
-            series_map[label] = [merged[t] for t in sorted(merged)]
+            label_slot_counts[label] = merged
+            all_slots.update(merged.keys())
 
-    return series_map, label_to_today_id
+    timeline = sorted(all_slots)
+    series_map = {
+        label: [slot_counts.get(t, 0.0) for t in timeline]
+        for label, slot_counts in label_slot_counts.items()
+    }
+
+    return series_map, label_to_today_id, timeline
 
 
 def run(date: str) -> None:
@@ -125,19 +146,19 @@ def run(date: str) -> None:
     day_end = datetime.fromisoformat(date).replace(
         hour=0, minute=0, second=0, tzinfo=WIB
     ) + timedelta(days=1)
-    window_start = day_end - timedelta(hours=WINDOW_HOURS)
+    query_start = day_end - timedelta(hours=WINDOW_HOURS)
 
     logger.info(
-        f"detector | date={date} | window {window_start} -> {day_end} | "
+        f"detector | date={date} | window {query_start} -> {day_end} | "
         f"{len(clusters_today)} cluster hari ini, {len(clusters_prev)} cluster kemarin"
     )
 
-    volumes_by_cluster_id = get_volumes_grouped_by_cluster(start=window_start, end=day_end)
+    volumes_by_cluster_id = get_volumes_grouped_by_cluster(start=query_start, end=day_end)
     if not volumes_by_cluster_id:
         logger.warning(f"detector | date={date} | no volume data in window")
         return
 
-    series_map, label_to_today_id = _merge_series_by_label(
+    series_map, label_to_today_id, timeline = _merge_series_by_label(
         clusters_today, clusters_prev, volumes_by_cluster_id
     )
 
@@ -159,7 +180,7 @@ def run(date: str) -> None:
             continue
 
         peak_idx = _peak_slot_index(series_a) if spike_a >= spike_b else _peak_slot_index(series_b)
-        trimmed_a, trimmed_b = _trim_around_peak(series_a, series_b, peak_idx)
+        trimmed_a, trimmed_b, lo, hi = _trim_around_peak(series_a, series_b, peak_idx)
 
         if not trimmed_a or not trimmed_b or max(trimmed_a) == 0 or max(trimmed_b) == 0:
             skipped_dead_zone += 1
@@ -177,9 +198,16 @@ def run(date: str) -> None:
         rising_id  = label_to_today_id[rising_label]
         falling_id = label_to_today_id[falling_label]
 
+        # Window aktual yang dipakai untuk hitung korelasi/spike pasangan ini —
+        # dipakai analyzer supaya tweet yang dianalisis konsisten dengan window
+        # deteksi (bisa merentang ke "kemarin" kalau peak jatuh sebelum tengah malam).
+        alert_window_start = timeline[lo]
+        alert_window_end   = timeline[hi - 1] + timedelta(hours=settings.VOLUME_INTERVAL_HOURS)
+
         logger.info(
             f"detector | ALERT | rising='{rising_label}' | falling='{falling_label}' | "
-            f"lag={best_lag}h | corr={best_corr:.3f} | spike={spike_magnitude:.2f}x"
+            f"lag={best_lag}h | corr={best_corr:.3f} | spike={spike_magnitude:.2f}x | "
+            f"window={alert_window_start} -> {alert_window_end}"
         )
 
         save_alert(
@@ -191,6 +219,8 @@ def run(date: str) -> None:
             lag_hours=best_lag,
             correlation=best_corr,
             spike_magnitude=spike_magnitude,
+            window_start=alert_window_start,
+            window_end=alert_window_end,
         )
         alerts_found += 1
 

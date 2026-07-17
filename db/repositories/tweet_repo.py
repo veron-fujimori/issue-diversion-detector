@@ -28,7 +28,9 @@ def get_volume_by_topics_and_slot(topics: list[str], slot_start: datetime) -> in
     )
     return count
 
-def get_all_tweets_by_topics_and_date(topics: list[str], date: str) -> list[dict]:
+def get_all_tweets_by_topics_and_window(
+    topics: list[str], window_start: datetime, window_end: datetime
+) -> list[dict]:
     with get_cursor() as cur:
         cur.execute(
             """
@@ -45,15 +47,15 @@ def get_all_tweets_by_topics_and_date(topics: list[str], date: str) -> list[dict
             JOIN tweet_topic tt ON tt.tweet_id = t.tweet_id
             LEFT JOIN "user" u ON u.screen_name = t.user_screen_name
             WHERE tt.topic = ANY(%s)
-              AND t.collected_date = %s
+              AND t.timestamp_utc >= %s AND t.timestamp_utc < %s
             ORDER BY t.tweet_id
             """,
-            (topics, date),
+            (topics, window_start, window_end),
         )
         rows = cur.fetchall()
 
     logger.debug(
-        f"tweet_repo | date={date} | topics={len(topics)} | "
+        f"tweet_repo | window={window_start}->{window_end} | topics={len(topics)} | "
         f"fetched {len(rows)} tweets (no sampling)"
     )
     return rows

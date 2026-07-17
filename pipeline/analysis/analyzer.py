@@ -1,13 +1,15 @@
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from db.repositories.alert_repo import Alert
-from db.repositories.tweet_repo import get_all_tweets_by_topics_and_date
+from db.repositories.tweet_repo import get_all_tweets_by_topics_and_window
 from utils.logger import logger
+
+WIB = timezone(timedelta(hours=7))
 
 _STOPWORDS_SET           = set(StopWordRemoverFactory().get_stop_words())
 _HASHTAG_MENTION_PATTERN = re.compile(r"[#@]\w+")
@@ -118,7 +120,19 @@ def _is_low_followers(followers_count) -> bool:
 
 
 def run(alert: Alert, rising_topics: list[str]) -> AnalysisResult:
-    tweets = get_all_tweets_by_topics_and_date(rising_topics, alert.detected_at)
+    window_start, window_end = alert.window_start, alert.window_end
+    if window_start is None or window_end is None:
+        # Alert lama dari sebelum migrasi 005 (belum ada window_start/window_end
+        # tersimpan) — fallback ke rentang detected_at satu hari penuh, sama
+        # seperti perilaku sebelum fix ini.
+        ref = datetime.fromisoformat(alert.detected_at).replace(tzinfo=WIB)
+        window_start, window_end = ref, ref + timedelta(days=1)
+        logger.warning(
+            f"analyzer | alert_id={alert.id} | no window_start/window_end on alert "
+            f"(pre-migration legacy row) — falling back to full day {alert.detected_at}"
+        )
+
+    tweets = get_all_tweets_by_topics_and_window(rising_topics, window_start, window_end)
 
     if not tweets:
         logger.warning(
