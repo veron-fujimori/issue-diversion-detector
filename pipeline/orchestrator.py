@@ -25,17 +25,17 @@ def run_collection(
  
     logger.info(f"orchestrator | ===== COLLECTION {start} → {end} =====")
  
-    logger.info("orchestrator | [collect 1/3] trends")
-    trends_collector.run(start, end)
+    # logger.info("orchestrator | [collect 1/3] trends")
+    # trends_collector.run(start, end)
  
     logger.info("orchestrator | [collect 2/3] tweets")
     tweets_collector.run(start, end)
  
-    if include_users:
-        logger.info("orchestrator | [collect 3/3] users")
-        users_collector.run()
-    else:
-        logger.info("orchestrator | [collect 3/3] users — skipped (--skip-users)")
+    # if include_users:
+    #     logger.info("orchestrator | [collect 3/3] users")
+    #     users_collector.run()
+    # else:
+    #     logger.info("orchestrator | [collect 3/3] users — skipped (--skip-users)")
  
     logger.info(f"orchestrator | ===== COLLECTION DONE {start} → {end} =====")
 

@@ -183,7 +183,11 @@ def _init_scweet() -> Scweet:
         f"daily_tweets={settings.SCWEET_DAILY_TWEETS}/acct limit={settings.SCWEET_LIMIT}/job"
     )
 
-    s = Scweet(cookies=cookies_data, config=scweet_cfg)
+    # db_path must also be passed to the constructor directly -- Scweet.__init__
+    # unconditionally overwrites config.db_path with its own db_path default
+    # ("scweet_state.db") whenever the constructor arg isn't given explicitly,
+    # even when a ScweetConfig with a different db_path is passed in.
+    s = Scweet(cookies=cookies_data, db_path=str(state_db), config=scweet_cfg)
     logger.info("tweets_collector | Scweet initialised ✓")
     return s
 
