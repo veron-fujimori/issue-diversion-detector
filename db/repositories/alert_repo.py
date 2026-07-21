@@ -23,6 +23,10 @@ class Alert:
     # rentang detected_at satu hari penuh kalau ini None.
     window_start: Optional[datetime] = None
     window_end: Optional[datetime] = None
+    # Signifikansi statistik korelasi (lihat migrasi 006). None untuk alert
+    # lama — scorer memperlakukan None sebagai "tidak ada diskon kepercayaan".
+    p_value: Optional[float] = None
+    p_value_adjusted: Optional[float] = None
 
 def _row_to_alert(row: dict) -> Alert:
     return Alert(
@@ -39,6 +43,8 @@ def _row_to_alert(row: dict) -> Alert:
         score_breakdown=dict(row["score_breakdown"]) if row["score_breakdown"] else None,
         window_start=row["window_start"],
         window_end=row["window_end"],
+        p_value=row["p_value"],
+        p_value_adjusted=row["p_value_adjusted"],
     )
 
 def save_alert(
@@ -52,6 +58,8 @@ def save_alert(
     spike_magnitude: float,
     window_start: datetime,
     window_end: datetime,
+    p_value: float,
+    p_value_adjusted: float,
 ) -> int:
     with get_cursor() as cur:
         cur.execute(
@@ -61,17 +69,20 @@ def save_alert(
                 rising_cluster_id, rising_cluster_label,
                 falling_cluster_id, falling_cluster_label,
                 lag_hours, correlation, spike_magnitude,
-                window_start, window_end
+                window_start, window_end,
+                p_value, p_value_adjusted
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (detected_at, rising_cluster_id, falling_cluster_id)
             DO UPDATE SET
-                lag_hours       = EXCLUDED.lag_hours,
-                correlation     = EXCLUDED.correlation,
-                spike_magnitude = EXCLUDED.spike_magnitude,
-                window_start    = EXCLUDED.window_start,
-                window_end      = EXCLUDED.window_end,
-                created_at      = NOW()
+                lag_hours        = EXCLUDED.lag_hours,
+                correlation      = EXCLUDED.correlation,
+                spike_magnitude  = EXCLUDED.spike_magnitude,
+                window_start     = EXCLUDED.window_start,
+                window_end       = EXCLUDED.window_end,
+                p_value          = EXCLUDED.p_value,
+                p_value_adjusted = EXCLUDED.p_value_adjusted,
+                created_at       = NOW()
             RETURNING id
             """,
             (
@@ -80,6 +91,7 @@ def save_alert(
                 falling_cluster_id, falling_cluster_label,
                 lag_hours, correlation, spike_magnitude,
                 window_start, window_end,
+                p_value, p_value_adjusted,
             ),
         )
         row = cur.fetchone()
@@ -114,7 +126,8 @@ def get_alerts_by_date(detected_at: str) -> list[Alert]:
                 falling_cluster_id, falling_cluster_label,
                 lag_hours, correlation, spike_magnitude,
                 confidence_score, score_breakdown,
-                window_start, window_end
+                window_start, window_end,
+                p_value, p_value_adjusted
             FROM alerts
             WHERE detected_at = %s
             ORDER BY correlation ASC
@@ -135,7 +148,8 @@ def get_alerts_pending_scoring(detected_at: str) -> list[Alert]:
                 falling_cluster_id, falling_cluster_label,
                 lag_hours, correlation, spike_magnitude,
                 confidence_score, score_breakdown,
-                window_start, window_end
+                window_start, window_end,
+                p_value, p_value_adjusted
             FROM alerts
             WHERE detected_at = %s
               AND confidence_score IS NULL

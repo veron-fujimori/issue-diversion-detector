@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from itertools import combinations
+from scipy import stats
+from scipy.stats import false_discovery_control
 from config.settings import settings
 from db.repositories.alert_repo import save_alert
 from db.repositories.cluster_repo import get_clusters_by_date
@@ -65,20 +67,38 @@ def _trim_around_peak(series_a, series_b, peak_idx):
 def _best_lagged_correlation(series_a, series_b):
     best_corr = 1.0
     best_lag = 0
+    best_n = 0
     for lag_slot in LAG_SLOTS:
         a1, b1 = _apply_lag_pair(series_a, series_b, lag_slot)
         if len(a1) >= MIN_DATA_POINTS:
             corr = _pearson(a1, b1)
             if corr < best_corr:
-                best_corr, best_lag = corr, lag_slot * settings.VOLUME_INTERVAL_HOURS
+                best_corr, best_lag, best_n = corr, lag_slot * settings.VOLUME_INTERVAL_HOURS, len(a1)
         if lag_slot == 0:
             continue
         b2, a2 = _apply_lag_pair(series_b, series_a, lag_slot)
         if len(a2) >= MIN_DATA_POINTS:
             corr = _pearson(a2, b2)
             if corr < best_corr:
-                best_corr, best_lag = corr, -(lag_slot * settings.VOLUME_INTERVAL_HOURS)
-    return best_corr, best_lag
+                best_corr, best_lag, best_n = corr, -(lag_slot * settings.VOLUME_INTERVAL_HOURS), len(a2)
+    return best_corr, best_lag, best_n
+
+
+def _one_tailed_pvalue(r: float, n: int) -> float:
+    """
+    P(korelasi senegatif ini atau lebih, murni dari noise) — one-tailed
+    karena kita cuma peduli arah negatif (displacement), bukan korelasi
+    ekstrem di kedua arah. Pakai t-distribution standar; df = n - 2.
+    """
+    if n < 3:
+        return 1.0
+    df = n - 2
+    if r <= -1.0:
+        return 0.0
+    if r >= 1.0:
+        return 1.0
+    t = r * (df ** 0.5) / ((1 - r ** 2) ** 0.5)
+    return float(stats.t.cdf(t, df))
 
 def _merge_series_by_label(
     clusters_today, clusters_prev, volumes_by_cluster_id: dict
@@ -159,7 +179,7 @@ def run(date: str) -> None:
         logger.info(f"detector | date={date} | not enough clusters with data to compare")
         return
 
-    alerts_found = 0
+    candidates: list[dict] = []
     skipped_dead_zone = 0
 
     for label_a, label_b in combinations(labels_today, 2):
@@ -178,14 +198,21 @@ def run(date: str) -> None:
             skipped_dead_zone += 1
             continue
 
-        best_corr, best_lag = _best_lagged_correlation(trimmed_a, trimmed_b)
+        best_corr, best_lag, best_n = _best_lagged_correlation(trimmed_a, trimmed_b)
         if best_corr > CORRELATION_THRESHOLD:
             continue
 
+        # lag_hours sign dinormalisasi relatif ke rising/falling (bukan ke
+        # label_a/label_b, yang urutannya cuma kebetulan dari itertools.combinations).
+        # Konvensi: positif = rising mendahului falling (diversion muncul duluan/
+        # bersamaan), negatif = falling mendahului rising (reaksi klasik menutupi
+        # isu yang sudah viral duluan).
         if spike_a >= spike_b:
             rising_label, falling_label, spike_magnitude = label_a, label_b, spike_a
+            lag_hours = best_lag
         else:
             rising_label, falling_label, spike_magnitude = label_b, label_a, spike_b
+            lag_hours = -best_lag
 
         rising_id  = label_to_today_id[rising_label]
         falling_id = label_to_today_id[falling_label]
@@ -196,27 +223,60 @@ def run(date: str) -> None:
         alert_window_start = timeline[lo]
         alert_window_end   = timeline[hi - 1] + timedelta(hours=settings.VOLUME_INTERVAL_HOURS)
 
+        candidates.append({
+            "rising_id": rising_id,
+            "rising_label": rising_label,
+            "falling_id": falling_id,
+            "falling_label": falling_label,
+            "lag_hours": lag_hours,
+            "correlation": best_corr,
+            "spike_magnitude": spike_magnitude,
+            "window_start": alert_window_start,
+            "window_end": alert_window_end,
+            "p_value": _one_tailed_pvalue(best_corr, best_n),
+        })
+
+    if not candidates:
         logger.info(
-            f"detector | ALERT | rising='{rising_label}' | falling='{falling_label}' | "
-            f"lag={best_lag}h | corr={best_corr:.3f} | spike={spike_magnitude:.2f}x | "
-            f"window={alert_window_start} -> {alert_window_end}"
+            f"detector | date={date} | done | 0 alerts | "
+            f"{skipped_dead_zone} pairs skipped (dead zone)"
+        )
+        return
+
+    # Koreksi multiple-comparison: banyak pasangan diuji per hari, jadi p-value
+    # mentah di-adjust pakai Benjamini-Hochberg (FDR) supaya alert dengan
+    # korelasi lemah dari window data yang tipis gak dipercaya sama kayak alert
+    # dengan bukti yang benar-benar kuat secara statistik. Disimpan untuk
+    # visibilitas/scoring -- TIDAK dipakai sebagai gate di sini.
+    adjusted_p_values = false_discovery_control(
+        [c["p_value"] for c in candidates], method="bh"
+    )
+
+    for candidate, p_adjusted in zip(candidates, adjusted_p_values):
+        logger.info(
+            f"detector | ALERT | rising='{candidate['rising_label']}' | "
+            f"falling='{candidate['falling_label']}' | lag={candidate['lag_hours']}h | "
+            f"corr={candidate['correlation']:.3f} | spike={candidate['spike_magnitude']:.2f}x | "
+            f"p={candidate['p_value']:.4f} | p_adj={p_adjusted:.4f} | "
+            f"window={candidate['window_start']} -> {candidate['window_end']}"
         )
 
         save_alert(
             detected_at=date,
-            rising_cluster_id=rising_id,
-            rising_cluster_label=rising_label,
-            falling_cluster_id=falling_id,
-            falling_cluster_label=falling_label,
-            lag_hours=best_lag,
-            correlation=best_corr,
-            spike_magnitude=spike_magnitude,
-            window_start=alert_window_start,
-            window_end=alert_window_end,
+            rising_cluster_id=candidate["rising_id"],
+            rising_cluster_label=candidate["rising_label"],
+            falling_cluster_id=candidate["falling_id"],
+            falling_cluster_label=candidate["falling_label"],
+            lag_hours=candidate["lag_hours"],
+            correlation=candidate["correlation"],
+            spike_magnitude=candidate["spike_magnitude"],
+            window_start=candidate["window_start"],
+            window_end=candidate["window_end"],
+            p_value=candidate["p_value"],
+            p_value_adjusted=float(p_adjusted),
         )
-        alerts_found += 1
 
     logger.info(
-        f"detector | date={date} | done | {alerts_found} alerts | "
+        f"detector | date={date} | done | {len(candidates)} alerts | "
         f"{skipped_dead_zone} pairs skipped (dead zone)"
     )

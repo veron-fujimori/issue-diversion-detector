@@ -24,10 +24,18 @@ _SPIKE_SCORE_FLOOR   = settings.SPIKE_RATIO_THRESHOLD
 _SPIKE_SCORE_CEILING = _SPIKE_SCORE_FLOOR + 8.0
 _SPIKE_SCORE_SPAN    = _SPIKE_SCORE_CEILING - _SPIKE_SCORE_FLOOR
 
-def _score_correlation(correlation: float) -> float:
+def _confidence_factor(p_adjusted: float | None) -> float:
+    # p_adjusted None berarti alert lama (sebelum migrasi 006) -- gak ada
+    # diskon, sama seperti perilaku sebelum p-value ada.
+    if p_adjusted is None:
+        return 1.0
+    return 1.0 - min(1.0, max(0.0, p_adjusted))
+
+
+def _score_correlation(correlation: float, p_adjusted: float | None) -> float:
     normalized = (_CORR_SCORE_FLOOR - correlation) / _CORR_SCORE_SPAN
     normalized = min(1.0, max(0.0, normalized))
-    return round(normalized * W_CORRELATION, 2)
+    return round(normalized * _confidence_factor(p_adjusted) * W_CORRELATION, 2)
 
 def _score_spike(spike_magnitude: float) -> float:
     normalized = min(1.0, max(0.0, (spike_magnitude - _SPIKE_SCORE_FLOOR) / _SPIKE_SCORE_SPAN))
@@ -49,7 +57,7 @@ def compute(
     analysis: AnalysisResult,
     context: ContextCheckResult | None = None,
 ) -> tuple[float, dict]:
-    s_correlation = _score_correlation(alert.correlation)
+    s_correlation = _score_correlation(alert.correlation, alert.p_value_adjusted)
     s_spike       = _score_spike(alert.spike_magnitude)
     s_coordinated = _score_ratio(analysis.coordinated_ratio, W_COORDINATED)
 
@@ -62,6 +70,9 @@ def compute(
             "score": s_correlation, "max": W_CORRELATION,
             "raw": round(alert.correlation, 4),
             "floor": _CORR_SCORE_FLOOR, "ceiling": _CORR_SCORE_CEILING,
+            "p_value": alert.p_value,
+            "p_value_adjusted": alert.p_value_adjusted,
+            "confidence_factor": _confidence_factor(alert.p_value_adjusted),
         },
         "spike": {
             "score": s_spike, "max": W_SPIKE,
