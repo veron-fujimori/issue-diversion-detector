@@ -163,7 +163,13 @@ def render_volume_explorer(target_date: str) -> None:
 
 
 def render_displacement_chart(alert: Alert) -> None:
-    window_start, window_end = _window_for_date(alert.detected_at)
+    if alert.window_start is not None and alert.window_end is not None:
+        window_start, window_end = alert.window_start, alert.window_end
+        window_label = "detection window"
+    else:
+        window_start, window_end = _window_for_date(alert.detected_at)
+        window_label = "48-hour window — legacy alert, no stored window"
+
     volumes = get_volumes_grouped_by_cluster(start=window_start, end=window_end)
 
     rising_vols  = sorted(volumes.get(alert.rising_cluster_id, []),  key=lambda v: v.slot_start)
@@ -192,7 +198,7 @@ def render_displacement_chart(alert: Alert) -> None:
     ))
 
     fig.update_layout(
-        title="Volume Displacement Pattern (48-hour window)",
+        title=f"Volume Displacement Pattern ({window_label})",
         xaxis=dict(title="Time", tickformat="%H:%M\n%d-%b"),
         yaxis=dict(
             title=dict(text=alert.rising_cluster_label, font=dict(color="#E45756")),
@@ -263,6 +269,17 @@ def render_score_breakdown(alert: Alert) -> None:
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
+    corr = breakdown.get("correlation")
+    if corr and corr.get("p_value") is not None:
+        st.caption(
+            f"📊 Correlation significance: p={corr['p_value']:.4f}, "
+            f"p_adj={corr['p_value_adjusted']:.4f} (Benjamini-Hochberg across that "
+            f"day's candidates) | confidence factor {corr['confidence_factor']:.2f}x "
+            f"applied to the correlation score"
+        )
+    elif corr:
+        st.caption("📊 No significance data for this alert (legacy alert, predates p-value tracking).")
 
     ctx = breakdown.get("context_check")
     if ctx and ctx.get("independent_event"):
