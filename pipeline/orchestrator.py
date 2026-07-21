@@ -39,6 +39,7 @@ def run_collection(
  
     logger.info(f"orchestrator | ===== COLLECTION DONE {start} → {end} =====")
 
+
 def run_for_date(date: str) -> None:
     logger.info(f"orchestrator | ===== START {date} =====")
     try:
@@ -58,7 +59,6 @@ def run_for_date(date: str) -> None:
         raise
 
     logger.info(f"orchestrator | ===== DONE {date} =====")
-
 
 def run_analysis_range(date_start: str | None = None, date_end: str | None = None) -> None:
     """

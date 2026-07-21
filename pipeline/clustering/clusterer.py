@@ -1,8 +1,8 @@
-from utils.logger import logger
-from utils.llm.client import llm
-from db.repositories.trending_repo import get_unique_topics_by_date
 from db.repositories.cluster_repo import save_clusters, get_recent_clusters
+from db.repositories.trending_repo import get_unique_topics_by_date
 from pipeline.clustering.prompt import SYSTEM_PROMPT, build_user_prompt
+from utils.llm.client import llm
+from utils.logger import logger
 
 def _extract_clusters(raw: dict | list) -> list[dict]:
     if isinstance(raw, list):
@@ -17,6 +17,33 @@ def _extract_clusters(raw: dict | list) -> list[dict]:
         for item in items
         if item.get("label") and item.get("topics")
     ]
+
+def _reconcile_topics(topics: list[str], clusters: list[dict]) -> list[dict]:
+    assigned: dict[str, list[int]] = {}
+    for i, cluster in enumerate(clusters):
+        for topic in cluster["topics"]:
+            assigned.setdefault(topic, []).append(i)
+
+    duplicated = [t for t, idxs in assigned.items() if len(idxs) > 1]
+    if duplicated:
+        logger.warning(
+            f"clusterer | {len(duplicated)} topic(s) assigned to multiple clusters by the LLM, "
+            f"keeping first occurrence only: {duplicated[:10]}"
+        )
+        for topic in duplicated:
+            for i in assigned[topic][1:]:
+                clusters[i]["topics"].remove(topic)
+        clusters = [c for c in clusters if c["topics"]]
+
+    missing = [t for t in topics if t not in assigned]
+    if missing:
+        logger.warning(
+            f"clusterer | {len(missing)} topic(s) dropped by the LLM, "
+            f"adding as singleton clusters: {missing[:10]}"
+        )
+        clusters += [{"label": t, "topics": [t]} for t in missing]
+
+    return clusters
 
 def run(date: str) -> None:
     topics = get_unique_topics_by_date(date)
@@ -45,5 +72,6 @@ def run(date: str) -> None:
     )
 
     clusters = _extract_clusters(response.content)
+    clusters = _reconcile_topics(topics, clusters)
     save_clusters(date, clusters)
     logger.info(f"clusterer | date={date} | done, {len(clusters)} clusters saved")

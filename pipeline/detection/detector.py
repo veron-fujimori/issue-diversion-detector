@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta, timezone
 from itertools import combinations
-from utils.logger import logger
 from config.settings import settings
+from db.repositories.alert_repo import save_alert
 from db.repositories.cluster_repo import get_clusters_by_date
 from db.repositories.volume_repo import get_volumes_grouped_by_cluster
-from db.repositories.alert_repo import save_alert
+from utils.logger import logger
 
 WIB = timezone(timedelta(hours=7))
 WINDOW_HOURS = 48
@@ -14,10 +14,9 @@ SPIKE_RATIO_THRESHOLD = settings.SPIKE_RATIO_THRESHOLD
 MIN_DATA_POINTS = 6
 CORR_WINDOW_HOURS = 12
 
-
 def _pearson(x: list[float], y: list[float]) -> float:
     n = len(x)
-    if n < 2:
+    if n < 2 or len(y) != n:
         return 0.0
     mean_x = sum(x) / n
     mean_y = sum(y) / n
@@ -28,7 +27,6 @@ def _pearson(x: list[float], y: list[float]) -> float:
         return 0.0
     return num / (den_x * den_y)
 
-
 def _apply_lag_pair(a, b, lag):
     if lag == 0:
         return a, b
@@ -36,7 +34,6 @@ def _apply_lag_pair(a, b, lag):
     if lag >= n:
         return [], []
     return a[: n - lag], b[lag:]
-
 
 def _spike_ratio(series):
     if not series or max(series) == 0:
@@ -46,12 +43,10 @@ def _spike_ratio(series):
         return 0.0
     return max(series) / mean_val
 
-
 def _peak_slot_index(series):
     if not series or max(series) == 0:
         return 0
     return series.index(max(series))
-
 
 def _trim_around_peak(series_a, series_b, peak_idx):
     """Potong kedua series ke window sama panjang di sekitar peak_idx.
@@ -66,7 +61,6 @@ def _trim_around_peak(series_a, series_b, peak_idx):
     lo = max(0, peak_idx - half_window)
     hi = min(shortest, peak_idx + half_window + 1)
     return series_a[lo:hi], series_b[lo:hi], lo, hi
-
 
 def _best_lagged_correlation(series_a, series_b):
     best_corr = 1.0
@@ -85,7 +79,6 @@ def _best_lagged_correlation(series_a, series_b):
             if corr < best_corr:
                 best_corr, best_lag = corr, -(lag_slot * settings.VOLUME_INTERVAL_HOURS)
     return best_corr, best_lag
-
 
 def _merge_series_by_label(
     clusters_today, clusters_prev, volumes_by_cluster_id: dict
@@ -112,7 +105,7 @@ def _merge_series_by_label(
         label_to_ids.setdefault(c.cluster_label, []).append(c.id)
     for c in clusters_today:
         label_to_ids.setdefault(c.cluster_label, []).append(c.id)
-        label_to_today_id[c.cluster_label] = c.id  # id milik hari ini menang
+        label_to_today_id[c.cluster_label] = c.id
 
     label_slot_counts: dict[str, dict] = {}
     all_slots: set = set()
@@ -133,7 +126,6 @@ def _merge_series_by_label(
 
     return series_map, label_to_today_id, timeline
 
-
 def run(date: str) -> None:
     clusters_today = get_clusters_by_date(date)
     if not clusters_today:
@@ -150,7 +142,7 @@ def run(date: str) -> None:
 
     logger.info(
         f"detector | date={date} | window {query_start} -> {day_end} | "
-        f"{len(clusters_today)} cluster hari ini, {len(clusters_prev)} cluster kemarin"
+        f"{len(clusters_today)} clusters today, {len(clusters_prev)} clusters yesterday"
     )
 
     volumes_by_cluster_id = get_volumes_grouped_by_cluster(start=query_start, end=day_end)

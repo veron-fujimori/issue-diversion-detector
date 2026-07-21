@@ -1,8 +1,7 @@
 from datetime import datetime, timedelta
-from db.connection import get_cursor
 from config.settings import settings
+from db.connection import get_cursor
 from utils.logger import logger
-
 
 def get_volume_by_topics_and_slot(topics: list[str], slot_start: datetime) -> int:
     slot_end = slot_start + timedelta(hours=settings.VOLUME_INTERVAL_HOURS)
