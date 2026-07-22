@@ -25,17 +25,17 @@ def run_collection(
  
     logger.info(f"orchestrator | ===== COLLECTION {start} → {end} =====")
  
-    # logger.info("orchestrator | [collect 1/3] trends")
-    # trends_collector.run(start, end)
+    logger.info("orchestrator | [collect 1/3] trends")
+    trends_collector.run(start, end)
  
     logger.info("orchestrator | [collect 2/3] tweets")
     tweets_collector.run(start, end)
  
-    # if include_users:
-    #     logger.info("orchestrator | [collect 3/3] users")
-    #     users_collector.run()
-    # else:
-    #     logger.info("orchestrator | [collect 3/3] users — skipped (--skip-users)")
+    if include_users:
+        logger.info("orchestrator | [collect 3/3] users")
+        users_collector.run(start, end)
+    else:
+        logger.info("orchestrator | [collect 3/3] users — skipped (--skip-users)")
  
     logger.info(f"orchestrator | ===== COLLECTION DONE {start} → {end} =====")
 
@@ -43,14 +43,14 @@ def run_collection(
 def run_for_date(date: str) -> None:
     logger.info(f"orchestrator | ===== START {date} =====")
     try:
-        # logger.info(f"orchestrator | [1/4] clustering")
-        # clusterer.run(date)
+        logger.info(f"orchestrator | [1/4] clustering")
+        clusterer.run(date)
 
-        # logger.info(f"orchestrator | [2/4] timeseries")
-        # timeseries.run(date)
+        logger.info(f"orchestrator | [2/4] timeseries")
+        timeseries.run(date)
 
-        # logger.info(f"orchestrator | [3/4] detection")
-        # detector.run(date)
+        logger.info(f"orchestrator | [3/4] detection")
+        detector.run(date)
         
         logger.info(f"orchestrator | [4/4] analysis and scoring")
         _run_analysis_and_scoring(date)

@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     TRENDING_BASE_URL: str = "https://archive.twitter-trending.com"
 
-    CONTEXT_CHECK_ENABLED: bool = True
+    CONTEXT_CHECK_ENABLED: bool = False
     CONTEXT_CHECK_MAX_SUPPRESSION: float = 0.5
     CONTEXT_CHECK_MIN_CONFIDENCE: float = 0.6
 

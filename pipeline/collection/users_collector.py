@@ -104,19 +104,34 @@ def _init_scweet() -> Scweet:
 # Work list
 # ---------------------------------------------------------------------------
 
-def _get_usernames_needing_profiles() -> list[str]:
-    """Distinct tweet authors that have no row in the user table yet."""
+def _get_usernames_needing_profiles(
+    date_start: Optional[str] = None, date_end: Optional[str] = None
+) -> list[str]:
+    """
+    Distinct tweet authors that have no row in the user table yet.
+
+    With no date range: every author across the whole tweet table's history
+    (the standalone/manual "catch up on everything" behaviour). With a date
+    range: scoped to tweet.collected_date, the same WIB calendar-date column
+    tweets_collector stamps and filters by — so a run_collection() call only
+    fetches profiles for authors of tweets actually collected in that range,
+    instead of also re-scanning every prior run's backlog.
+    """
+    where = ['t.user_screen_name IS NOT NULL', 'u.screen_name IS NULL']
+    params: list = []
+    if date_start and date_end:
+        where.append('t.collected_date BETWEEN %s AND %s')
+        params.extend([date_start, date_end])
+
+    query = f"""
+        SELECT DISTINCT t.user_screen_name
+        FROM tweet t
+        LEFT JOIN "user" u ON u.screen_name = t.user_screen_name
+        WHERE {' AND '.join(where)}
+        ORDER BY t.user_screen_name
+    """
     with get_cursor() as cur:
-        cur.execute(
-            """
-            SELECT DISTINCT t.user_screen_name
-            FROM tweet t
-            LEFT JOIN "user" u ON u.screen_name = t.user_screen_name
-            WHERE t.user_screen_name IS NOT NULL
-              AND u.screen_name IS NULL
-            ORDER BY t.user_screen_name
-            """
-        )
+        cur.execute(query, params)
         return [r["user_screen_name"] for r in cur.fetchall()]
 
 
@@ -226,10 +241,14 @@ def _run_validation() -> None:
 # Entry point
 # ---------------------------------------------------------------------------
 
-def run() -> None:
+def run(date_start: Optional[str] = None, date_end: Optional[str] = None) -> None:
     logger.info("users_collector | Stage 2b — User Profile Collection")
+    if date_start and date_end:
+        logger.info(f"users_collector | scoped to collected_date {date_start} → {date_end}")
+    else:
+        logger.info("users_collector | no date range given — scanning entire tweet table history")
 
-    usernames = _get_usernames_needing_profiles()
+    usernames = _get_usernames_needing_profiles(date_start, date_end)
     total = len(usernames)
     logger.info(f"users_collector | accounts needing profiles: {total}")
 
