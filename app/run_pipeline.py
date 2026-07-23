@@ -106,6 +106,8 @@ def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
 
+    _resolve_date_range(args.date, args.start, args.end)
+
     init_pool()
     try:
         args.func(args)

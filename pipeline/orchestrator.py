@@ -3,7 +3,6 @@ from utils.logger import logger
 from db.repositories.trending_repo import get_all_dates
 from db.repositories.alert_repo import get_alerts_pending_scoring
 from db.repositories.cluster_repo import get_cluster_by_id
-from pipeline.collection import trends_collector, tweets_collector, users_collector
 from pipeline.clustering import clusterer
 from pipeline.timeseries import timeseries
 from pipeline.detection import detector
@@ -15,6 +14,8 @@ def run_collection(
     date_end: str | None = None,
     include_users: bool = True,
 ) -> None:
+    from pipeline.collection import trends_collector, tweets_collector, users_collector
+
     start = date_start or settings.DATE_START
     end   = date_end   or settings.DATE_END
  
