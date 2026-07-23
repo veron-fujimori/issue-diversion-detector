@@ -9,17 +9,12 @@ from pipeline.timeseries import timeseries
 from pipeline.detection import detector
 from pipeline.analysis import analyzer
 from pipeline.scoring import scorer
-from pipeline.context import context_checker
 
 def run_collection(
     date_start: str | None = None,
     date_end: str | None = None,
     include_users: bool = True,
 ) -> None:
-    """
-    Collect trends, then tweets, then (optionally) user profiles for a date
-    range. Falls back to settings.DATE_START / settings.DATE_END if not given.
-    """
     start = date_start or settings.DATE_START
     end   = date_end   or settings.DATE_END
  
@@ -61,11 +56,6 @@ def run_for_date(date: str) -> None:
     logger.info(f"orchestrator | ===== DONE {date} =====")
 
 def run_analysis_range(date_start: str | None = None, date_end: str | None = None) -> None:
-    """
-    Run the analysis chain for every date that has trending data within the
-    range. Falls back to settings range if not given; if the range is open,
-    processes all dates present in the trending table.
-    """
     all_dates = get_all_dates()
     if not all_dates:
         logger.warning("orchestrator | no dates found in trending table")
@@ -74,7 +64,6 @@ def run_analysis_range(date_start: str | None = None, date_end: str | None = Non
     start = date_start or settings.DATE_START
     end   = date_end   or settings.DATE_END
  
-    # Filter to the requested window (string date comparison is valid for ISO dates)
     dates = [d for d in all_dates if start <= d <= end]
     if not dates:
         logger.warning(
@@ -115,14 +104,7 @@ def _run_analysis_and_scoring(date: str) -> None:
                 continue
 
             analysis = analyzer.run(alert, rising_cluster.topics)
-
-            # Context checker: gated oleh settings DAN sample_size
-            if settings.CONTEXT_CHECK_ENABLED and analysis.sample_size > 0:
-                context = context_checker.run(alert, rising_cluster.topics)
-            else:
-                context = None
-
-            scorer.run(alert, analysis, context)
+            scorer.run(alert, analysis)
             succeeded += 1
 
         except Exception as e:
@@ -156,6 +138,5 @@ def run_full(
     date_end: str | None = None,
     include_users: bool = True,
 ) -> None:
-    """Collect the range, then analyze every date in it."""
     run_collection(date_start, date_end, include_users=include_users)
     run_analysis_range(date_start, date_end)

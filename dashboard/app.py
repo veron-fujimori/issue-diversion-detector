@@ -1,5 +1,4 @@
 import streamlit as st
-
 from dashboard.helpers import (
     date_picker,
     alert_selector,
@@ -15,12 +14,10 @@ st.set_page_config(
     layout="wide",
 )
 
-
 @st.cache_resource
 def _get_pool():
     init_pool()
     return True
-
 
 _get_pool()
 
@@ -28,11 +25,9 @@ st.title("Issue Diversion Dashboard")
 
 tab_volume, tab_overview, tab_detail = st.tabs(["Volume Explorer", "Overview", "Detail"])
 
-
 with tab_volume:
     volume_date = date_picker("Date", default_offset_days=1)
     render_volume_explorer(volume_date)
-
 
 with tab_overview:
     selected_date = date_picker()
@@ -83,7 +78,6 @@ with tab_overview:
                     st.session_state["selected_alert_id"]        = alert.id
                     st.session_state["selected_date_for_detail"] = selected_date
                     st.info("Switch to the 'Detail' tab to see the full breakdown.")
-
 
 with tab_detail:
     detail_date       = st.session_state.get("selected_date_for_detail", selected_date)

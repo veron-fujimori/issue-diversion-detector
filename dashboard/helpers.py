@@ -1,8 +1,6 @@
 from datetime import date, datetime, timedelta, timezone
-
 import plotly.graph_objects as go
 import streamlit as st
-
 from db.repositories.alert_repo import Alert
 from db.repositories.cluster_repo import get_clusters_by_date
 from db.repositories.volume_repo import get_volumes_grouped_by_cluster
@@ -280,23 +278,3 @@ def render_score_breakdown(alert: Alert) -> None:
         )
     elif corr:
         st.caption("📊 No significance data for this alert (legacy alert, predates p-value tracking).")
-
-    ctx = breakdown.get("context_check")
-    if ctx and ctx.get("independent_event"):
-        factor = ctx.get("suppression_factor", 1.0)
-        raw    = breakdown.get("raw_total_before_suppression", total)
-        if factor < 1.0:
-            st.warning(
-                f"⚠️ **Score suppressed by Context Checker** (factor {factor:.2f}x)\n\n"
-                f"Raw score: **{raw:.1f}** → after suppression: **{total:.1f}**\n\n"
-                f"**LLM confidence:** {ctx.get('confidence', 0):.2f}  |  "
-                f"**Grounded (valid web search):** {ctx.get('grounded')}\n\n"
-                f"**Reasoning:** {ctx.get('reasoning', '-')}"
-            )
-        else:
-            st.caption(
-                f"ℹ️ Context checker found signs of an independent event, but confidence "
-                f"({ctx.get('confidence', 0):.2f}) is below the minimum threshold — score not suppressed."
-            )
-    elif ctx and not ctx.get("grounded", True):
-        st.caption("⚠️ Context checker failed to perform a web search (fail-safe, score not suppressed).")

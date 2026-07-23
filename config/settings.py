@@ -19,7 +19,6 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str
     OPENAI_MODEL: str
-    OPENAI_SEARCH_MODEL: str = "gpt-5.4"
 
     REGION: str = "indonesia"
     DATE_START: str
@@ -32,10 +31,6 @@ class Settings(BaseSettings):
     SPIKE_RATIO_THRESHOLD: float = 2.0
 
     TRENDING_BASE_URL: str = "https://archive.twitter-trending.com"
-
-    CONTEXT_CHECK_ENABLED: bool = False
-    CONTEXT_CHECK_MAX_SUPPRESSION: float = 0.5
-    CONTEXT_CHECK_MIN_CONFIDENCE: float = 0.6
 
     SCWEET_LIMIT: int = 500
     SCWEET_DAILY_REQUESTS: int = 30
