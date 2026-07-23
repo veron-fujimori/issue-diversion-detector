@@ -93,6 +93,7 @@ def _init_scweet() -> Scweet:
     scweet_cfg = ScweetConfig(
         daily_requests_limit = settings.SCWEET_DAILY_REQUESTS,
         daily_tweets_limit   = settings.SCWEET_DAILY_TWEETS,
+        api_page_size        = settings.SCWEET_API_PAGE_SIZE,
         db_path              = str(state_db),
     )
     s = Scweet(cookies=cookies_data, config=scweet_cfg)

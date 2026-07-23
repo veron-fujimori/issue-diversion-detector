@@ -41,6 +41,7 @@ class Settings(BaseSettings):
 
     SCWEET_DAILY_REQUESTS: int = 30
     SCWEET_DAILY_TWEETS: int = 600
+    SCWEET_API_PAGE_SIZE: int = 20
     SCWEET_USER_INFO_BATCH: int = 20
 
     @property
