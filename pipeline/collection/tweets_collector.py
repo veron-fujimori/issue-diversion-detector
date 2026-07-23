@@ -459,7 +459,7 @@ def run(date_start: Optional[str] = None, date_end: Optional[str] = None) -> Non
 
     logger.info("tweets_collector | Stage 2 — Tweet Collection")
     logger.info(f"tweets_collector | region={region} | range={start} → {end} | limit={settings.SCWEET_LIMIT}/job")
-    logger.info("tweets_collector | lang filter disabled (lang=id + Latest returns 0 — Scweet bug)")
+    logger.info("tweets_collector | lang filter disabled (lang= + Latest returns 0 — Scweet bug)")
 
     s        = _init_scweet()
     all_days = _get_days_to_scrape(region, start, end)
@@ -562,7 +562,7 @@ def run(date_start: Optional[str] = None, date_end: Optional[str] = None) -> Non
         _mark_job_done(date_str, job["job_key"], job["job_type"], job["terms"], tweet_count, inserted)
         logger.info(f"tweets_collector |   ✓ inserted {inserted} new tweets")
 
-        if tweet_count >= settings.SCWEET_LIMIT:
+        if settings.SCWEET_LIMIT is not None and tweet_count >= settings.SCWEET_LIMIT:
             logger.warning(
                 f"tweets_collector |   ⚠ returned == limit ({settings.SCWEET_LIMIT}); "
                 "results may be truncated, consider raising SCWEET_LIMIT"

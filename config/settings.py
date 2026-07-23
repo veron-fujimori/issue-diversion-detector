@@ -1,5 +1,6 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _DATA_DIR = PROJECT_ROOT / "data"
@@ -32,7 +33,12 @@ class Settings(BaseSettings):
 
     TRENDING_BASE_URL: str = "https://archive.twitter-trending.com"
 
-    SCWEET_LIMIT: int = 500
+    CONTEXT_CHECK_ENABLED: bool = False
+    CONTEXT_CHECK_MAX_SUPPRESSION: float = 0.5
+    CONTEXT_CHECK_MIN_CONFIDENCE: float = 0.6
+
+    SCWEET_LIMIT: Optional[int] = None
+
     SCWEET_DAILY_REQUESTS: int = 30
     SCWEET_DAILY_TWEETS: int = 600
     SCWEET_USER_INFO_BATCH: int = 20
