@@ -1,4 +1,4 @@
-from db.repositories.cluster_repo import save_clusters, get_recent_clusters
+from db.repositories.cluster_repo import save_clusters, get_recent_clusters, get_clusters_by_date
 from db.repositories.trending_repo import get_unique_topics_by_date
 from pipeline.clustering.prompt import SYSTEM_PROMPT, build_user_prompt
 from utils.llm.client import llm
@@ -45,7 +45,11 @@ def _reconcile_topics(topics: list[str], clusters: list[dict]) -> list[dict]:
 
     return clusters
 
-def run(date: str) -> None:
+def run(date: str, force: bool = False) -> None:
+    if not force and get_clusters_by_date(date):
+        logger.info(f"clusterer | date={date} | clusters already exist, skipping (use force=True to re-cluster)")
+        return
+
     topics = get_unique_topics_by_date(date)
     if not topics:
         logger.warning(f"clusterer | date={date} | no topics found")

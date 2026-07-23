@@ -42,9 +42,9 @@ def _cmd_analyze(args) -> None:
     start, end = _resolve_date_range(args.date, args.start, args.end)
     _maybe_migrate(args.migrate)
     if start == end:
-        run_for_date(start)
+        run_for_date(start, force=args.force)
     else:
-        run_analysis_range(date_start=start, date_end=end)
+        run_analysis_range(date_start=start, date_end=end, force=args.force)
 
 def _cmd_all(args) -> None:
     start, end = _resolve_date_range(args.date, args.start, args.end)
@@ -53,6 +53,7 @@ def _cmd_all(args) -> None:
         date_start=start,
         date_end=end,
         include_users=not args.skip_users,
+        force=args.force,
     )
 
 def _add_date_arguments(subparser: argparse.ArgumentParser) -> None:
@@ -69,6 +70,13 @@ def _add_skip_users_argument(subparser: argparse.ArgumentParser) -> None:
         help="Skip user-profile collection (faster, weaker detection)",
     )
 
+def _add_force_argument(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument(
+        "--force", action="store_true",
+        help="Re-cluster even if clusters already exist for the date "
+             "(deletes existing clusters, cascading to their volumes and alerts)",
+    )
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Issue diversion detection pipeline")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -81,12 +89,14 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_analyze = sub.add_parser("analyze", help="Cluster → timeseries → detect")
     _add_date_arguments(p_analyze)
+    _add_force_argument(p_analyze)
     _add_migrate_argument(p_analyze)
     p_analyze.set_defaults(func=_cmd_analyze)
 
     p_all = sub.add_parser("all", help="Collect the range, then analyze every date")
     _add_date_arguments(p_all)
     _add_skip_users_argument(p_all)
+    _add_force_argument(p_all)
     _add_migrate_argument(p_all)
     p_all.set_defaults(func=_cmd_all)
 

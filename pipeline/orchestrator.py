@@ -35,11 +35,11 @@ def run_collection(
     logger.info(f"orchestrator | ===== COLLECTION DONE {start} → {end} =====")
 
 
-def run_for_date(date: str) -> None:
+def run_for_date(date: str, force: bool = False) -> None:
     logger.info(f"orchestrator | ===== START {date} =====")
     try:
         logger.info(f"orchestrator | [1/4] clustering")
-        clusterer.run(date)
+        clusterer.run(date, force=force)
 
         logger.info(f"orchestrator | [2/4] timeseries")
         timeseries.run(date)
@@ -55,7 +55,7 @@ def run_for_date(date: str) -> None:
 
     logger.info(f"orchestrator | ===== DONE {date} =====")
 
-def run_analysis_range(date_start: str | None = None, date_end: str | None = None) -> None:
+def run_analysis_range(date_start: str | None = None, date_end: str | None = None, force: bool = False) -> None:
     all_dates = get_all_dates()
     if not all_dates:
         logger.warning("orchestrator | no dates found in trending table")
@@ -75,7 +75,7 @@ def run_analysis_range(date_start: str | None = None, date_end: str | None = Non
     logger.info(f"orchestrator | analysis over {len(dates)} date(s) in {start} → {end}")
     for i, date in enumerate(dates, 1):
         logger.info(f"orchestrator | [{i}/{len(dates)}] {date}")
-        run_for_date(date)
+        run_for_date(date, force=force)
  
     logger.info(f"orchestrator | analysis complete — {len(dates)} date(s) processed")
 
@@ -137,6 +137,7 @@ def run_full(
     date_start: str | None = None,
     date_end: str | None = None,
     include_users: bool = True,
+    force: bool = False,
 ) -> None:
     run_collection(date_start, date_end, include_users=include_users)
-    run_analysis_range(date_start, date_end)
+    run_analysis_range(date_start, date_end, force=force)

@@ -9,10 +9,11 @@ Usage
 
     python -m app.main analyze
         (--date <YYYY-MM-DD> | --start <YYYY-MM-DD> --end <YYYY-MM-DD>)
+        [--force]
 
     python -m app.main all
         (--date <YYYY-MM-DD> | --start <YYYY-MM-DD> --end <YYYY-MM-DD>)
-        [--skip-users]
+        [--skip-users] [--force]
 
     python -m app.main migrate
 
